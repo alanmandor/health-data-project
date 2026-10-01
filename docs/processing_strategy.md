@@ -1,6 +1,6 @@
 # Processing and Incremental Loading Strategy
 
-Status: design proposal; not implemented. Based on the data dictionary and profiling of the current dataset. The analytical database and dbt adapter have not been selected yet.
+Status: accepted processing direction; implementation pending. DuckDB and dbt-duckdb are selected locally, with PostgreSQL for Airflow metadata. The [decision records](README.md) define delta delivery and Data Vault contracts; the [quality policy](data_quality_policy.md) governs corrections and consolidation.
 
 ## Processing Order and Responsibilities
 
@@ -9,8 +9,8 @@ Status: design proposal; not implemented. Based on the data dictionary and profi
 3. Parse and validate schemas, types, keys, and dates in staging while preserving original records. Isolate record-level errors when the file can be parsed; mark unreadable files as failed.
 4. Integrate participants.csv as the authoritative participant master.
 5. Integrate device_metadata.csv and participant-device assignments, checking references. Assignment changes require effective dates before historical events can be attributed to devices.
-6. Integrate steps, heart_rate, sleep, and wellness_survey. These branches can run in parallel after the master data is available. Split sleep data into sessions and stages.
-7. Retry records with unresolved references, apply quality rules, and build the historical integration layer if Data Vault is adopted.
+6. Integrate steps, heart_rate, sleep, and wellness_survey. Preparation can run in parallel after master data is available; independent processes writing the shared DuckDB database must serialize through one pool slot. Split sleep data into sessions and stages.
+7. Retry records with unresolved references, apply quality rules, and build the selected Data Vault historical integration layer.
 8. Build dimensions and facts; recalculate affected participant-date combinations and their weeks; run checks and publish a consistent version.
 
 Airflow coordinates dependencies and retries; Python discovers, copies, and loads data; dbt transforms and validates it. Ingestion success and publication success are separate states. A failed publication resumes from persisted data.
@@ -27,7 +27,7 @@ The data does not include a transaction log or a reliable updated_at field. The 
 - A later file version takes precedence only if the contract states that it replaces the previous version. Arrival order does not establish which value is correct.
 - A missing row does not imply deletion. Apply deletions only through explicit tombstones or a complete, validated snapshot with a declared scope. Without that contract, retain records and flag differences.
 
-Each file must declare its delivery mode: delta, full snapshot, or replacement of a defined scope (for example, a participant and month). Preserve the current dataset as the baseline; future delivery semantics require confirmation from the source owner.
+The project adopts full-record deltas, including a bootstrap delta for the initial dataset. A later accepted sequenced batch supersedes prior values under an explicit exercise assumption. Missing rows do not imply deletion; deletions require explicit operations. See ADR 002 for stable sequence assignment and old-batch replay protection. Validate these assumptions with a real producer before extending the integration.
 
 ## Keys and Conflicts
 
@@ -53,11 +53,11 @@ The current profile contains 14 surveys for P999 without a corresponding master 
 
 The 50 participants are an expectation for the initial batch, not a schema limit. Validate that baseline while accepting new identifiers from the authoritative master in future batches. A subsequent absence does not automatically deactivate a participant. Separate participant identity from study membership, including enrollment dates and status when supplied by the source. Calculate expected coverage from membership and the applicable period rather than a constant of 50.
 
-If Data Vault is adopted, a hub may retain a business key observed in an event with its source lineage; this does not establish enrollment. Eligibility for analysis still depends on the master. Inferred members are not required in the initial marts.
+In the selected Data Vault design, a hub may retain a business key observed in an event with its source lineage; this does not establish enrollment. Eligibility for analysis still depends on the master. Inferred members are not required in the initial marts.
 
 ## dbt Incremental Models and Change Propagation
 
-Start with incremental facts because of their volume: approximately four million minute-level rows across the two sources. Small master tables can initially be rebuilt in full; preserve change history when needed. MERGE/upsert support depends on the selected database and adapter. unique_key does not replace deduplication or uniqueness tests.
+Start with incremental facts because of their volume: approximately four million minute-level rows across the two sources. Small current master projections can initially be rebuilt in full; retain their vault history. Use transactional delete/insert for accepted current-state keys and aggregates, with explicit deletion handling. Verify adapter behavior before implementation. unique_key does not replace deduplication or uniqueness tests.
 
 Select records from pending batches through a persisted change relation rather than timestamp > MAX(timestamp) in the target. Event time describes when the event occurred; ingested_at describes when it arrived. Newly received historical data must be processed.
 
@@ -65,7 +65,7 @@ Maintain affected_participant_dates for inserts, corrections, authorized deletio
 
 Recalculate each affected day from all its current facts, not just the delta. Recalculate the full week from its current daily data. Also remove obsolete summaries if an authorized change leaves a group without facts. A recent lookback window can optimize checks, but must not limit late-data recovery. Week boundaries and inclusion rules still require analytical definition.
 
-If Data Vault is adopted, hubs and links insert missing keys; satellites append accepted changes and preserve earlier versions. A transition A -> B -> A is a real change: compare against the current state, not every historical hash. Separate effective time, load time, and source version. Do not turn conflicts within a batch into valid history.
+Data Vault hubs and links insert missing keys; satellites preserve source versions and identify accepted changes without treating unresolved conflicts as authoritative history. A transition A -> B -> A is a real change: compare against the current state, not every historical hash. Separate effective time, load time, and source version.
 
 For larger scale, use deliveries partitioned by date and source, manifests, streaming reads, and fact partitioning when supported by the database. Avoid rereading full historical arrays every day. Infrastructure choices depend on volume, latency, and concurrency; participant growth alone does not require an architecture change.
 
@@ -84,6 +84,6 @@ Publish batch reconciliation metrics for original, accepted, identical duplicate
 
 ## Decisions Required Before Implementation
 
-Select the database and adapter; confirm future delivery semantics and correction precedence; define deletions and effective enrollment/assignment dates; resolve units, conflicts, and sleep semantics; establish week boundaries and publication thresholds. This document proposes mechanisms without treating those decisions as resolved or CDC as implemented.
+The database, adapter direction, delta assumption, correction precedence, Data Vault direction, quality policies, and [weekly publication schedule](publication_schedule.md) are selected. Before implementation, pin compatible versions, specify physical hashes/models, configure the daily execution time and availability polling, and define critical publication checks. Future enrollment/assignment effective dates still require source data. No pipeline or CDC implementation is claimed.
 
 Technical reference: [dbt incremental models](https://docs.getdbt.com/docs/build/incremental-models).

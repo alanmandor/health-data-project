@@ -1,6 +1,6 @@
 # Architecture outline
 
-Status: proposal for evaluation, not an implemented architecture.
+Status: platform and integration direction selected; implementation pending. See the [decision records](README.md) and [quality policy](data_quality_policy.md) for accepted contracts and assumptions.
 
 ## Target flow
 
@@ -26,17 +26,25 @@ flowchart LR
 | Airflow | Schedule daily and weekly workflows, retries, dependencies, and backfills | Required |
 | dbt Core | SQL transformations, model dependencies, data tests, and generated documentation | Required |
 | Docker Compose | Reproducible local development environment | Planned |
-| Analytical database | Execute dbt models and serve analytical tables | To select |
-| Airflow metadata database | Store orchestration state separately from analytical data | To configure |
+| DuckDB with dbt-duckdb | Execute dbt models and serve analytical tables | Selected; not configured |
+| PostgreSQL | Store Airflow orchestration state separately from analytical data | Selected; not configured |
 | CI | Validate code, dbt models, and reproducibility | Planned |
 
-## Data Vault 2.0 evaluation
+## Data Vault Integration
 
-Evaluate participant and device hubs, their relationship link, and descriptive satellites. Define business keys, record source, load timestamps, deterministic hashing, historization, and replay behavior explicitly.
+Implement participant and device hubs, their assignment link, and descriptive satellites. Use separate participant-attached observation satellites for steps and heart rate, and session/response hubs and links for sleep and wellness. See [ADR 003](decisions/003_data_vault_model.md) for grains, enrollment context, versioning, and device attribution limits.
 
-Choose the grain of minute observations, sleep sessions, and surveys after profiling. High-volume observations need a deliberate design; they should not automatically become one new hub per reading.
+Minute observations use participant and UTC timestamp discriminators rather than one hub per reading. Raw and vault history preserve source evidence; current projections apply accepted quality rules and authoritative delta precedence.
 
-Compare the auditability and source-change isolation of a vault against its extra tables, joins, and development effort for a 50-participant study. Describe this as a Data Vault 2.0-aligned implementation unless broader methodology requirements are actually met. Assess an automation package only after selecting a compatible database and dbt adapter.
+The additional tables and joins are an accepted trade-off for auditability and source history. Describe this as Data Vault 2.0-aligned unless broader methodology requirements are met. Assess any automation package against the selected DuckDB adapter before adoption.
+
+## Local Execution and Cloud Target
+
+Use immutable raw storage and delta delivery manifests. Current facts and aggregates use transactional delete/insert; vault history preserves versions. All independent DuckDB writer processes share one Airflow pool slot. File preparation can run in parallel. See [ADR 001](decisions/001_local_platform.md) and [ADR 002](decisions/002_delta_contract.md).
+
+Development environments are separate database files rebuilt from manifests or created through consistent physical copies. Snowflake remains a cloud target; Zero-Copy Clone and warehouse isolation are not simulated by these copies.
+
+Biostatistics publications freeze an input manifest and correction cutoff, preserve reported sleep metrics, and consolidate unresolved semantic issues with warnings. Discordant post-boundary awake stages are excluded only from consolidated output. Late corrections create publication revisions. The [quality policy](data_quality_policy.md) defines this lifecycle.
 
 ## Kimball evaluation
 
@@ -47,8 +55,8 @@ Daily and weekly outputs should derive from shared rules. Document week boundari
 ## Reliability and learning checkpoints
 
 1. Inventory and profile the data; capture evidence before defining corrections.
-2. Select the database and explain local/cloud alternatives, cost, and concurrency.
-3. Record the vault and dimensional modeling decisions with example records.
+2. Configure the selected local database and verify adapter/runtime compatibility.
+3. Translate the accepted vault design into physical models and configure the accepted [publication schedule](publication_schedule.md), including source-availability checks.
 4. Implement one source end to end with quality checks, lineage, and idempotent reruns.
 5. Extend the pipeline, add daily/weekly Airflow schedules, and verify backfills.
 6. Validate analytical results and package the reproducible local environment.

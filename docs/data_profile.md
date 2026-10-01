@@ -2,6 +2,8 @@
 
 Read-only inspection of all 154 downloaded files. No raw records were changed. Findings describe this snapshot, not future batches.
 
+The proposed handling below records the initial profiling assessment. Accepted rules and assumptions now reside in the [data quality and correction policy](data_quality_policy.md) and [Data Vault decision](decisions/003_data_vault_model.md); these take precedence for implementation. Profiling heuristics are not automatically acceptance rules.
+
 ## Structure and grain
 
 | Source | Format | Grain | Observed rows |
