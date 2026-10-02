@@ -2,6 +2,8 @@
 
 Status: Data Vault selected; entity design accepted as the implementation starting point.
 
+The [table catalog](../table_catalog.md) provides the proposed column/grain contracts, separates wear_site into assignment history and age/max_heart_rate into enrollment context, and adds study_hk to minute-observation discriminators. It defines physical tables versus current-state views; analytical DDL remains unimplemented.
+
 ## Entities and Grain
 
 | Entity | Proposed Structures | Business Key / Grain |

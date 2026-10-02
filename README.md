@@ -14,6 +14,8 @@ Follow the [Docker quick start](docs/docker_quickstart.md) to build the image, i
 
 ## Structure
 
+The [database foundation](docs/database_ddl.md) includes DuckDB and Snowflake DDL, SQLite controls, and Snowflake team roles with read-only published data and writable workspaces for derived tables and views. The scripts create empty objects; analytical transformations and publication gates remain to be implemented.
+
 - `src/`: ingestion and profiling code.
 - `dags/`: Airflow workflows.
 - `dbt/`: transformation models, macros, and tests.

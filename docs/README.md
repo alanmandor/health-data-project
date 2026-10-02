@@ -10,6 +10,8 @@ We will document architecture, data quality rules, validation results, and trade
 - [Airflow orchestration design](airflow_design.md)
 - [Delivery manifest contract](delivery_manifest.md)
 - [Time storage and study calendar policy](time_policy.md)
+- [Logical table catalog and column contracts](table_catalog.md)
+- [Database DDL and consumer access contracts](database_ddl.md)
 - [Airflow phase one](airflow_phase_one.md)
 - [Docker quick start](docker_quickstart.md)
 - [ADR 001: Local analytical platform](decisions/001_local_platform.md)

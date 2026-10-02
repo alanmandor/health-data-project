@@ -34,6 +34,8 @@ flowchart LR
 
 Implement participant and device hubs, their assignment link, and descriptive satellites. Use separate participant-attached observation satellites for steps and heart rate, and session/response hubs and links for sleep and wellness. See [ADR 003](decisions/003_data_vault_model.md) for grains, enrollment context, versioning, and device attribution limits.
 
+The [table catalog](table_catalog.md) defines proposed control, raw/staging, vault, current-state, dimensional, daily, and revision-specific publication relations before loading implementation.
+
 Minute observations use participant and UTC timestamp discriminators rather than one hub per reading. Raw and vault history preserve source evidence; current projections apply accepted quality rules and authoritative delta precedence.
 
 The additional tables and joins are an accepted trade-off for auditability and source history. Describe this as Data Vault 2.0-aligned unless broader methodology requirements are met. Assess any automation package against the selected DuckDB adapter before adoption.
