@@ -1,0 +1,5 @@
+# Airflow runtime dependencies. Install with the versioned Airflow constraints.
+apache-airflow==3.1.7
+apache-airflow-providers-standard==1.11.0
+apache-airflow-providers-amazon==9.21.0
+apache-airflow-providers-fab==3.2.0

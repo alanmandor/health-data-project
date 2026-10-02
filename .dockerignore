@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+data
+output
+logs
+.venv
+**/__pycache__
+dbt/target
+dbt/logs
+dbt/dbt_packages
+dbt/profiles.yml

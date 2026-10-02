@@ -1,0 +1,106 @@
+name: health-data-project
+
+x-airflow-common: &airflow-common
+  image: health-data-project-airflow:3.1.7
+  build:
+    context: .
+    dockerfile: infra/Dockerfile
+  environment: &airflow-environment
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Bogota
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-local-development-only-health-data-project}
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW_JWT_SECRET:-local-development-only-health-data-project}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__CORE__PARALLELISM: '4'
+    AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
+    AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-change-this-local-password}
+    PROJECT_RAW_DIR: /opt/airflow/project-data/raw
+    PROJECT_DATABASE_PATH: /opt/airflow/project-data/warehouse.duckdb
+    DBT_PROFILES_DIR: /opt/airflow/project-data/dbt-profiles
+  volumes:
+    - ./dags:/opt/airflow/dags:ro
+    - ./src:/opt/airflow/project/src:ro
+    - ./scripts:/opt/airflow/project/scripts:ro
+    - ./dbt:/opt/airflow/project/dbt:ro
+    - project-data:/opt/airflow/project-data
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
+    airflow-init:
+      condition: service_completed_successfully
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16.13-bookworm
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U airflow -d airflow']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    user: '0:0'
+    entrypoint: /bin/bash
+    command:
+      - -ec
+      - |
+        mkdir -p /opt/airflow/project-data /opt/airflow/logs
+        chown -R 50000:0 /opt/airflow/project-data /opt/airflow/logs
+        exec /entrypoint bash /opt/airflow/initialize.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  airflow-api-server:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - '127.0.0.1:${AIRFLOW_PORT:-8080}:8080'
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8080/api/v2/monitor/health']
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8974/health']
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ['CMD-SHELL', 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  postgres-data:
+  project-data:
+  airflow-logs:

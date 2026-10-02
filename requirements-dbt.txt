@@ -1,0 +1,4 @@
+# Install in a separate virtual environment to isolate dbt from Airflow.
+dbt-core==1.11.15
+dbt-duckdb==1.11.0
+duckdb==1.5.6

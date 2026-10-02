@@ -8,6 +8,7 @@ We will document architecture, data quality rules, validation results, and trade
 - [Data quality and correction policy](data_quality_policy.md)
 - [Analytics and biostatistics publication schedule](publication_schedule.md)
 - [Airflow orchestration design](airflow_design.md)
+- [Docker quick start](docker_quickstart.md)
 - [ADR 001: Local analytical platform](decisions/001_local_platform.md)
 - [ADR 002: Delta deliveries and idempotent updates](decisions/002_delta_contract.md)
 - [ADR 003: Data Vault integration model](decisions/003_data_vault_model.md)

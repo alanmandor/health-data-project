@@ -23,11 +23,11 @@ flowchart LR
 | Component | Responsibility | Status |
 | --- | --- | --- |
 | Python | Retrieve source files, inventory inputs, profile data, load staging | Planned |
-| Airflow | Schedule daily and weekly workflows, retries, dependencies, and backfills | Required |
-| dbt Core | SQL transformations, model dependencies, data tests, and generated documentation | Required |
-| Docker Compose | Reproducible local development environment | Planned |
-| DuckDB with dbt-duckdb | Execute dbt models and serve analytical tables | Selected; not configured |
-| PostgreSQL | Store Airflow orchestration state separately from analytical data | Selected; not configured |
+| Airflow | Schedule daily and weekly workflows, retries, dependencies, and backfills | Local services verified; processing DAGs pending |
+| dbt Core | SQL transformations, model dependencies, data tests, and generated documentation | Installed in an isolated environment; models pending |
+| Docker Compose | Reproducible local development environment | Configuration and startup verified |
+| DuckDB with dbt-duckdb | Execute dbt models and serve analytical tables | Dependencies installed; analytical models pending |
+| PostgreSQL | Store Airflow orchestration state separately from analytical data | Metadata database initialized and verified |
 | CI | Validate code, dbt models, and reproducibility | Planned |
 
 ## Data Vault Integration

@@ -1,12 +1,12 @@
 # Airflow Orchestration Design
 
-Status: initial design for review; no DAGs or runtime deployed. Existing delivery, quality, and publication policies remain authoritative.
+Status: orchestration design; local runtime configuration is provided in compose.yaml. Daily and weekly DAGs remain unimplemented. Existing delivery, quality, and publication policies remain authoritative.
 
 ## Local Runtime
 
 Use Linux containers through Docker Compose, PostgreSQL for Airflow metadata, and LocalExecutor for this single-host exercise. LocalExecutor runs independent task processes, so it does not remove DuckDB's cross-process access restrictions. Use one shared persistent analytical volume and the duckdb_access pool with one slot for every task opening that database, including readers that might overlap a writer. Separate source I/O tasks can run concurrently.
 
-Choose a pinned Airflow 3.x release and matching standard/Amazon providers after installation and image compatibility checks. Do not claim an exact release has been validated yet. An Airflow 3 deployment needs the API server, scheduler, DAG processor, metadata database, and initialization step; add a triggerer if deferrable sensors are selected. Use reschedule sensors initially to avoid a mandatory triggerer. Build dependencies into an image or a dedicated dbt environment instead of installing them at every container startup.
+The local image selects Airflow 3.1.7 with Python 3.12 and compatible providers from its official constraints. requirements.txt pins runtime packages; requirements-dbt.txt declares a separate dbt environment. See the [Docker quick start](docker_quickstart.md). An Airflow 3 deployment needs the API server, scheduler, DAG processor, metadata database, and initialization step; add a triggerer if deferrable sensors are selected. Use reschedule sensors initially to avoid a mandatory triggerer. Dependencies are installed during image construction rather than container startup.
 
 Runtime data, logs, and database volumes must be outside OneDrive synchronization. Keep credentials in Airflow connections/environment configuration outside Git. Treat the Compose deployment as local development, not a production deployment.
 
