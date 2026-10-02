@@ -6,7 +6,7 @@ An incremental data engineering project for wearable activity, heart rate, sleep
 
 Apache Airflow will orchestrate delta ingestion and dbt transformations. The selected local platform uses DuckDB for analytics and a separate PostgreSQL database for Airflow metadata. A Data Vault 2.0-aligned integration layer will preserve source history, with Kimball dimensional marts above it. Snowflake is the documented cloud target; local environment copies do not implement Zero-Copy Clone.
 
-The repository includes a local Docker Compose environment and pinned top-level dependencies. Data ingestion, Data Vault models, and scheduled analytics pipelines are not implemented yet.
+The repository includes a local Docker Compose environment, pinned top-level dependencies, and [first-phase manual DAGs](docs/airflow_phase_one.md) for delivery registration and weekly calendar inspection. Raw ingestion, Data Vault models, analytical readiness, and biostatistics publication are not implemented yet.
 
 ## Local Docker Setup
 

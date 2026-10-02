@@ -10,7 +10,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-    AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Bogota
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: UTC
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
@@ -22,12 +22,17 @@ x-airflow-common: &airflow-common
     AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-change-this-local-password}
     PROJECT_RAW_DIR: /opt/airflow/project-data/raw
     PROJECT_DATABASE_PATH: /opt/airflow/project-data/warehouse.duckdb
+    STUDY_TIMEZONE: ${STUDY_TIMEZONE:-America/Bogota}
+    PROJECT_INCOMING_DIR: /opt/airflow/project-data/incoming
+    PYTHONPATH: /opt/airflow/project/src
     DBT_PROFILES_DIR: /opt/airflow/project-data/dbt-profiles
   volumes:
     - ./dags:/opt/airflow/dags:ro
     - ./src:/opt/airflow/project/src:ro
     - ./scripts:/opt/airflow/project/scripts:ro
     - ./dbt:/opt/airflow/project/dbt:ro
+    - ./tests:/opt/airflow/project/tests:ro
+    - ./examples:/opt/airflow/project/examples:ro
     - project-data:/opt/airflow/project-data
     - airflow-logs:/opt/airflow/logs
   depends_on:

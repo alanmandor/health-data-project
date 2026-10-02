@@ -1,6 +1,8 @@
 # Airflow Orchestration Design
 
-Status: orchestration design; local runtime configuration is provided in compose.yaml. Daily and weekly DAGs remain unimplemented. Existing delivery, quality, and publication policies remain authoritative.
+Status: orchestration design; local runtime configuration is provided in compose.yaml. The [first-phase DAGs](airflow_phase_one.md) implement manual delivery registration and weekly calendar inspection only. Processing, analytical readiness, and publication remain unimplemented. Existing delivery, quality, and publication policies remain authoritative.
+
+The two-DAG design with tasks grouped by independently retryable processing phase is accepted. Keep ingestion/transformation functions outside DAG definitions. dbt manages model-level dependencies; Airflow invokes coherent model groups instead of duplicating the entire dbt dependency graph. The [delivery manifest contract](delivery_manifest.md) specifies availability and immutable batch registration.
 
 ## Local Runtime
 
@@ -71,6 +73,6 @@ Use catchup=False for the initial demonstration. Replay the January-February 202
 5. Implement weekly dependency, atomic input freeze, and versioned publication.
 6. Verify missing delivery, declared empty delta, delayed Sunday data, critical validation failure, conflicting rows, retry after commit, Monday-to-Tuesday delay, and late publication revisions.
 
-Still required before scheduling: the daily trigger time, the expected-delivery manifest specification, sensor timeout, validated runtime pins, and concrete processing commands. The public baseline inventory must not be mistaken for a newly arrived Sunday delta.
+Still required before scheduling: the daily trigger time, sensor timeout, concrete manifest validators/registration and processing commands. The local runtime pins have passed infrastructure startup checks; data pipeline behavior remains to be tested. The public baseline inventory must not be mistaken for a newly arrived Sunday delta.
 
 References: [Airflow scheduling](https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/cron.html), [sensors](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/sensors.html), [pools](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/pools.html), [LocalExecutor](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/executor/local.html).

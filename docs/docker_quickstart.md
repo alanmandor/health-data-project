@@ -1,6 +1,6 @@
 # Docker Quick Start
 
-This setup starts the local Airflow infrastructure. The daily and weekly data pipelines are still under development; an empty DAG list is expected initially.
+This setup starts the local Airflow infrastructure. The [first-phase DAGs](airflow_phase_one.md) support manual delivery registration and weekly calendar inspection; the complete daily and weekly data pipelines remain under development.
 
 ## Prerequisites
 
@@ -62,7 +62,7 @@ Do not add --volumes unless you intend to permanently delete this project's meta
 
 ## Scheduling Status
 
-Timezone: America/Bogota. The selected weekly trigger is Monday 03:00, conditional on validated Sunday delivery. Daily trigger time and delivery sensor timeout remain to be configured. No automatic processing of the baseline or live source is enabled by this infrastructure setup.
+Timestamp reference: UTC. Study calendar: America/Bogota. The selected weekly trigger is Monday 03:00 local time (08:00 UTC), conditional on validated Sunday delivery. Daily trigger time and operational delivery sensor timeout remain to be configured. First-phase DAGs use schedule=None and require explicit manual scope; no automatic baseline or live-source processing is enabled.
 
 Reference: [Airflow Docker guide](https://airflow.apache.org/docs/apache-airflow/3.1.7/howto/docker-compose/index.html).
 

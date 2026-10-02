@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "delivery_id": "example-empty-2026-01-11",
+  "source_system": "pmdata_synthetic",
+  "provenance": "synthetic_fixture",
+  "batch_kind": "daily",
+  "delivery_mode": "delta",
+  "target_dates": ["2026-01-11"],
+  "timezone": "America/Bogota",
+  "completed_at": "2026-01-12T01:30:00-05:00",
+  "sources": {
+    "participants": {"status": "empty_delta", "files": []},
+    "device_metadata": {"status": "empty_delta", "files": []},
+    "steps": {"status": "empty_delta", "files": []},
+    "heart_rate": {"status": "empty_delta", "files": []},
+    "sleep": {"status": "empty_delta", "files": []},
+    "wellness_survey": {"status": "empty_delta", "files": []}
+  }
+}

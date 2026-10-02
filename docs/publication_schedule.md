@@ -6,6 +6,8 @@ Status: accepted scheduling policy; Airflow implementation pending.
 
 Use America/Bogota (UTC-05:00) for scheduling and study calendar boundaries. A weekly event period starts Monday at 00:00 inclusive and ends the following Monday at 00:00 exclusive, covering all of Sunday without truncating fractional seconds. Store UTC timestamps alongside local period identifiers.
 
+UTC is the reference for stored event instants, load timestamps, cutoffs, and completion timestamps. Calendar-only dates retain study meaning, and original timestamps/offsets remain in lineage. STUDY_TIMEZONE is configurable for future studies; it does not make Bogotá the default interpretation for all international sources. See the [time policy](time_policy.md).
+
 Analytics runs daily and processes the preceding local calendar day plus accepted corrections affecting earlier dates. Its exact daily execution time remains to be configured. On Monday, the Sunday ingestion and analytics validation must complete before weekly consolidation.
 
 ## Monday Consolidation
