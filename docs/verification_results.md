@@ -13,12 +13,41 @@ P001's January 21 output retains 327 reported sleep minutes and 100% reported ef
 ## Verification Coverage
 
 - Thirty Python tests cover calendar/manifest contracts, raw capture/load/archive recovery, real dbt corrections/deletes/reference recovery, Vault rollback and history, dimensional updates, daily publication/retry, and frozen weekly publication/revisions.
-- Six foundation tests verify all 57 tables, repeatable bootstrap, valid facts versus invalid raw values, publication gating, immutable revision visibility, staging casts/arrays, and SQLite control preservation.
+- Nine foundation tests verify all 60 tables, repeatable bootstrap and catalog seeds, valid facts versus invalid raw values, publication gating, immutable revision visibility, staging casts/arrays, SQLite control preservation, quality domains, and migration preservation/rollback. The [foundation guide](database_ddl.md#verification) lists the three added tests and their scope.
 - Daily and weekly DAGs each run twice using isolated temporary storage. Verification checks four source files archived once, one frozen publication, readiness fingerprints, and a terminal awake exclusion without deleting provisional stages.
 - Independent baseline checks reconcile raw/quality counts, Vault lineage, issue/resolution integrity, affected-date consumption, dimensional facts, daily totals, weekly totals, retained/excluded stages, selected version counts, and exported gzip manifest checksums.
 - An explicit five-week replay reuses all existing publication identities and cutoffs without creating new revisions. Generated DuckDB and Snowflake DDL match their shared source definition, and both Airflow DAGs import successfully.
 
 Run verification only while other tasks accessing the real warehouse are idle. The isolated unit suite uses separate temporary databases; baseline verifiers use read-only connections. Do not overlap a read-only verifier with a DuckDB writer.
+
+## Quality Domains and Reference Catalogs
+
+Nine foundation tests now pass, including invalid-domain insert/update rejection,
+repeatable ledger migration with unchanged history, and transaction rollback when
+existing resolution codes are invalid. The local warehouse migration preserved
+all 39,882 issue rows and 1,397 resolution rows. DuckDB now enforces issue status,
+severity, and resolution-code domains. Snowflake retains pipeline-level validation;
+no cloud constraint enforcement is claimed.
+The real dbt delta-quality integration test also passes with the constrained schema,
+covering reference recovery, reopening, accepted corrections, invalid correction
+preservation, explicit deletes, and replay.
+The catalog follow-up brings the foundation to 60 tables in both engines. Local
+catalog verification confirms two issue statuses, three severity classifications,
+and six resolution codes, with English display names and descriptions. Repeated
+bootstrap preserves exactly the same seeds. The nine foundation checks pass; no
+additional full pipeline replay was needed for these descriptive equivalences.
+
+| Added catalog | Related field | Verified rows |
+| --- | --- | ---: |
+| `business.quality_issue_statuses` | `business.quality_issues.current_status` | 2 |
+| `business.quality_severities` | `business.quality_issues.severity` | 3 |
+| `business.quality_resolution_codes` | `business.quality_resolutions.resolution_code` | 6 |
+
+These three tables account for the increase from 57 to 60 foundation tables. The
+increase from six to nine foundation tests comes from domain rejection, repeatable
+history-preserving migration, and rollback on invalid historical values. Catalog
+equivalences are verified within the existing bootstrap test and by a targeted
+catalog check; the three tables do not each add a new test.
 
 ## Practical Limits
 
@@ -26,4 +55,4 @@ Both DAGs are manual until the operational daily trigger, availability timeout, 
 
 The loader supports additional participants and corrections without a fixed 50-user cap. This deployment registers one study per warehouse. Daily aggregates currently recompute the compact daily result rather than update only affected date groups. Large source files need streaming or an agreed chunk contract. DuckDB work is serialized and spills temporary state to disk under a managed memory limit; local frozen copies do not simulate Snowflake Zero-Copy Clone.
 
-These are explicit implementation boundaries, not claims of production deployment or clinical correctness. The [Docker quick start](docker_quickstart.md) and [weekly guide](weekly_biostatistics.md) describe reproducible local execution.
+These are explicit implementation boundaries, not claims of production deployment or clinical correctness. The [scope and limitations guide](scope_and_limitations.md) explains each trade-off and the work required to extend it. The [Docker quick start](docker_quickstart.md) and [weekly guide](weekly_biostatistics.md) describe reproducible local execution.

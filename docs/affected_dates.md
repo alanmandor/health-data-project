@@ -58,6 +58,6 @@ docker compose exec -T airflow-scheduler /opt/airflow/dbt-venv/bin/python /opt/a
 
 The integration fixture covers rollback, exact retry, local-date conversion across UTC midnight, late references, participant deletion, rejected and unchanged deltas, date moves with tombstones, profile corrections, and pending queue consumption.
 
-On October 4, 2026, the full baseline committed 1,400 state rows and 1,400 pending queue entries: 50 authoritative participants across 28 configured study days. P999 remained excluded. Independent verification passed, and a second invocation reused the same impact checkpoint without adding work. All six foundation tests passed with 49 tables; generated DuckDB and Snowflake DDL matched the central contract.
+On October 4, 2026, the full baseline committed 1,400 state rows and 1,400 pending queue entries: 50 authoritative participants across 28 configured study days. P999 remained excluded. Independent verification passed, and a second invocation reused the same impact checkpoint without adding work. Foundation checks passed at this implementation milestone. The current foundation has 60 tables and nine tests; see [verification results](verification_results.md).
 
 The updated Airflow DAG completed twice with isolated synthetic files and a temporary database. The fixture contained only a rejected measurement and no authoritative participants, so its impact count was zero. The second impact task reused the checkpoint, and the source file was archived exactly once.

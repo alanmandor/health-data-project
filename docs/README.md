@@ -1,6 +1,6 @@
 # Documentation
 
-We will document architecture, data quality rules, validation results, and trade-offs as we implement them.
+This index covers the implemented architecture, data quality rules, verification results, and documented trade-offs.
 
 - [Architecture outline](architecture.md)
 - [Initial data profile](data_profile.md)
@@ -21,10 +21,11 @@ We will document architecture, data quality rules, validation results, and trade
 - [Daily analytics and readiness](daily_analytics.md)
 - [Weekly frozen biostatistics](weekly_biostatistics.md)
 - [Local verification results](verification_results.md)
+- [Project scope, limits, and trade-offs](scope_and_limitations.md)
 - [Airflow phase one](airflow_phase_one.md)
 - [Docker quick start](docker_quickstart.md)
 - [ADR 001: Local analytical platform](decisions/001_local_platform.md)
 - [ADR 002: Delta deliveries and idempotent updates](decisions/002_delta_contract.md)
 - [ADR 003: Data Vault integration model](decisions/003_data_vault_model.md)
 
-The complete local pipeline is implemented: dependency/runtime setup, foundation DDL, ingestion, quality, Data Vault, issue history, affected dates, dimensional marts, daily analytics/readiness, and frozen weekly publication. Automatic scheduling still requires a daily execution time, operational availability timeout, and producer inventory mapping. Snowflake DDL and permissions require validation in a real cloud account.
+The complete local pipeline is implemented: dependency/runtime setup, foundation DDL, ingestion, quality, Data Vault, issue history, affected dates, dimensional marts, daily analytics/readiness, and frozen weekly publication. The foundation now includes 60 tables and nine schema tests, with three quality reference catalogs and three additional domain/migration tests mapped in the [foundation guide](database_ddl.md). Automatic scheduling still requires a daily execution time, operational availability timeout, and producer inventory mapping. Snowflake DDL and permissions require validation in a real cloud account.

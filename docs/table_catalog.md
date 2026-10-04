@@ -97,8 +97,11 @@ Assignment dates remain unknown without producer evidence. wear_site belongs to 
 | Relation | Materialization / Key | Columns and Behavior |
 | --- | --- | --- |
 | business.version_decisions | Append-only table; PK decision_id | version_id, source_relation, business_key_hash, study_hk, decision (accepted/rejected/conflict/pending_reference), decided_at TIMESTAMPTZ, rule_version, batch_id, reason_code nullable, normalized_payload_hash nullable; decisions can be superseded, not erased |
-| business.quality_issues | Table; PK issue_id | batch_id, record_id nullable, version_id nullable, rule_code, severity, first_seen_at, current_status; stable identity supports replay |
-| business.quality_resolutions | Append-only table; PK resolution_id | issue_id, resolved_at, resolution_code (including reopened), superseding_version_id nullable, publication_id nullable; preserve lifecycle transitions and future consolidation-specific resolutions |
+| business.quality_issue_statuses | Reference table; PK code | code, display_name, description; open/resolved equivalences for quality_issues.current_status |
+| business.quality_severities | Reference table; PK code | code, display_name, description; error/warning/pending equivalences for quality_issues.severity |
+| business.quality_resolution_codes | Reference table; PK code | code, display_name, description; six transition-code equivalences for quality_resolutions.resolution_code |
+| business.quality_issues | Table; PK issue_id | batch_id, record_id nullable, version_id nullable, rule_code, severity (error/warning/pending), first_seen_at, current_status (open/resolved); DuckDB enforces value domains; stable identity supports replay |
+| business.quality_resolutions | Append-only table; PK resolution_id | issue_id, resolved_at, resolution_code (reference_resolved/superseded_by_accepted_delta/source_deleted/rule_cleared/excluded_at_consolidation/reopened), superseding_version_id nullable, publication_id nullable; DuckDB enforces the code domain; preserve lifecycle transitions |
 | business.quality_evaluations | Append-only table; PK evaluation_id | vault_evaluation_id, implementation_hash, committed_at; checkpoint for atomic issue reconciliation and retries |
 | business.affected_participant_dates | Work queue; PK (study_hk, participant_hk, local_date, change_id) | reason_code, created_at, consumed_checkpoint_id nullable; old and new dates for key/date changes |
 | business.participant_date_state | Current signature; PK (study_hk, participant_hk, local_date) | state_hash, evaluation_id; accepted semantic inputs, contextual warnings, and reference state |

@@ -380,6 +380,27 @@ CREATE TABLE IF NOT EXISTS business.vault_loads (
     PRIMARY KEY (evaluation_id)
 );
 
+CREATE TABLE IF NOT EXISTS business.quality_issue_statuses (
+    code VARCHAR NOT NULL,
+    display_name VARCHAR NOT NULL,
+    description VARCHAR NOT NULL,
+    PRIMARY KEY (code)
+);
+
+CREATE TABLE IF NOT EXISTS business.quality_severities (
+    code VARCHAR NOT NULL,
+    display_name VARCHAR NOT NULL,
+    description VARCHAR NOT NULL,
+    PRIMARY KEY (code)
+);
+
+CREATE TABLE IF NOT EXISTS business.quality_resolution_codes (
+    code VARCHAR NOT NULL,
+    display_name VARCHAR NOT NULL,
+    description VARCHAR NOT NULL,
+    PRIMARY KEY (code)
+);
+
 CREATE TABLE IF NOT EXISTS business.quality_issues (
     issue_id VARCHAR NOT NULL,
     batch_id VARCHAR NOT NULL,
@@ -389,7 +410,9 @@ CREATE TABLE IF NOT EXISTS business.quality_issues (
     severity VARCHAR NOT NULL,
     first_seen_at TIMESTAMPTZ NOT NULL,
     current_status VARCHAR NOT NULL,
-    PRIMARY KEY (issue_id)
+    PRIMARY KEY (issue_id),
+    CHECK (severity IN ('error', 'warning', 'pending')),
+    CHECK (current_status IN ('open', 'resolved'))
 );
 
 CREATE TABLE IF NOT EXISTS business.quality_resolutions (
@@ -399,7 +422,8 @@ CREATE TABLE IF NOT EXISTS business.quality_resolutions (
     resolution_code VARCHAR NOT NULL,
     superseding_version_id VARCHAR,
     publication_id VARCHAR,
-    PRIMARY KEY (resolution_id)
+    PRIMARY KEY (resolution_id),
+    CHECK (resolution_code IN ('reference_resolved', 'superseded_by_accepted_delta', 'source_deleted', 'rule_cleared', 'excluded_at_consolidation', 'reopened'))
 );
 
 CREATE TABLE IF NOT EXISTS business.quality_evaluations (
@@ -862,6 +886,50 @@ CREATE TABLE IF NOT EXISTS publication_build.sleep_stage_candidates (
     warning_status VARCHAR,
     PRIMARY KEY (publication_id, session_version_id, stage_position)
 );
+
+INSERT INTO business.quality_issue_statuses (code, display_name, description)
+SELECT 'open', 'Open', 'The issue remains active and requires resolution.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_issue_statuses WHERE code = 'open');
+
+INSERT INTO business.quality_issue_statuses (code, display_name, description)
+SELECT 'resolved', 'Resolved', 'The issue was closed through an audited lifecycle transition.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_issue_statuses WHERE code = 'resolved');
+
+INSERT INTO business.quality_severities (code, display_name, description)
+SELECT 'error', 'Error', 'The record is rejected or conflicting and is excluded from accepted output.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_severities WHERE code = 'error');
+
+INSERT INTO business.quality_severities (code, display_name, description)
+SELECT 'warning', 'Warning', 'The record is accepted with a condition requiring review.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_severities WHERE code = 'warning');
+
+INSERT INTO business.quality_severities (code, display_name, description)
+SELECT 'pending', 'Pending', 'The record awaits an authoritative reference before acceptance.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_severities WHERE code = 'pending');
+
+INSERT INTO business.quality_resolution_codes (code, display_name, description)
+SELECT 'reference_resolved', 'Reference resolved', 'The missing authoritative reference became available.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_resolution_codes WHERE code = 'reference_resolved');
+
+INSERT INTO business.quality_resolution_codes (code, display_name, description)
+SELECT 'superseded_by_accepted_delta', 'Superseded by accepted delta', 'A later accepted upsert replaced the affected record.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_resolution_codes WHERE code = 'superseded_by_accepted_delta');
+
+INSERT INTO business.quality_resolution_codes (code, display_name, description)
+SELECT 'source_deleted', 'Source deleted', 'An accepted explicit delete removed the current business key.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_resolution_codes WHERE code = 'source_deleted');
+
+INSERT INTO business.quality_resolution_codes (code, display_name, description)
+SELECT 'rule_cleared', 'Rule cleared', 'The original issue condition no longer applies.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_resolution_codes WHERE code = 'rule_cleared');
+
+INSERT INTO business.quality_resolution_codes (code, display_name, description)
+SELECT 'excluded_at_consolidation', 'Excluded at consolidation', 'A permitted terminal awake interval was excluded from a frozen publication.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_resolution_codes WHERE code = 'excluded_at_consolidation');
+
+INSERT INTO business.quality_resolution_codes (code, display_name, description)
+SELECT 'reopened', 'Reopened', 'A previously resolved issue became active again; its current status is open.'
+WHERE NOT EXISTS (SELECT 1 FROM business.quality_resolution_codes WHERE code = 'reopened');
 
 CREATE VIEW IF NOT EXISTS staging.stg_participants AS
 SELECT r.record_id,

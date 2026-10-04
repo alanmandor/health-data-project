@@ -8,6 +8,8 @@ from pathlib import Path
 import duckdb
 
 from generate_ddl import TABLES
+from migrate_quality_domains import migrate
+from verify_quality_catalogs import verify as verify_catalogs
 
 DDL_ROOT = Path(__file__).resolve().parents[1] / "infra" / "ddl"
 
@@ -36,12 +38,51 @@ class FoundationTests(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT count(*) FROM raw.source_records").fetchone()[0], 1)
         count = self.db.execute("SELECT count(*) FROM information_schema.tables WHERE table_type = 'BASE TABLE'").fetchone()[0]
         self.assertEqual(count, len(TABLES))
+        self.assertEqual(verify_catalogs(self.db), {
+            'quality_issue_statuses': 2, 'quality_severities': 3, 'quality_resolution_codes': 6})
 
     def test_raw_invalid_measurement_is_preserved_but_fact_is_rejected(self):
         self.insert("raw.source_records", payload_json='{"heart_rate_bpm": 999}')
         with self.assertRaises(duckdb.ConstraintException):
             self.insert("marts.fact_heart_rate_minute", heart_rate_bpm=999)
         self.assertEqual(self.db.execute("SELECT count(*) FROM raw.source_records").fetchone()[0], 1)
+
+    def test_quality_domains_reject_invalid_inserts_and_updates(self):
+        self.insert('business.quality_issues', severity='warning', current_status='open')
+        for field, value in [('severity', 'fatal'), ('current_status', 'reopened')]:
+            with self.subTest(field=field), self.assertRaises(duckdb.ConstraintException):
+                self.db.execute(f'UPDATE business.quality_issues SET {field}=?', [value])
+        with self.assertRaises(duckdb.ConstraintException):
+            self.insert('business.quality_issues', issue_id='invalid', severity='error', current_status='unknown')
+        codes = ('reference_resolved', 'superseded_by_accepted_delta', 'source_deleted',
+                 'rule_cleared', 'excluded_at_consolidation', 'reopened')
+        for code in codes:
+            self.insert('business.quality_resolutions', resolution_id=code, resolution_code=code)
+        with self.assertRaises(duckdb.ConstraintException):
+            self.insert('business.quality_resolutions', resolution_id='invalid', resolution_code='unknown')
+
+    def test_quality_migration_preserves_history_and_repeats(self):
+        self.insert('business.quality_issues', severity='pending', current_status='open')
+        self.insert('business.quality_resolutions', resolution_code='reopened')
+        before = self.db.execute('SELECT * FROM business.quality_issues').fetchall()
+        history = self.db.execute('SELECT * FROM business.quality_resolutions').fetchall()
+        sql = (DDL_ROOT / 'duckdb/002_quality_domains.sql').read_text()
+        migrate(self.db, sql)
+        migrate(self.db, sql)
+        self.assertEqual(before, self.db.execute('SELECT * FROM business.quality_issues').fetchall())
+        self.assertEqual(history, self.db.execute('SELECT * FROM business.quality_resolutions').fetchall())
+
+    def test_quality_migration_rolls_back_invalid_existing_history(self):
+        self.insert('business.quality_issues', severity='warning', current_status='open')
+        self.db.execute('DROP TABLE business.quality_resolutions')
+        self.db.execute('CREATE TABLE business.quality_resolutions AS SELECT * FROM (VALUES '
+                        "('r', 'test', TIMESTAMPTZ '2026-01-01', 'unknown', NULL::VARCHAR, NULL::VARCHAR)) "
+                        't(resolution_id, issue_id, resolved_at, resolution_code, superseding_version_id, publication_id)')
+        with self.assertRaises(duckdb.ConstraintException):
+            migrate(self.db, (DDL_ROOT / 'duckdb/002_quality_domains.sql').read_text())
+        self.assertEqual(self.db.execute('SELECT resolution_code FROM business.quality_resolutions').fetchone()[0], 'unknown')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM business.quality_issues').fetchone()[0], 1)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM information_schema.tables WHERE table_name LIKE '%domain_migration'").fetchone()[0], 0)
 
     def test_published_revision_remains_visible_while_new_revision_builds(self):
         self.insert("publication_build.publications", publication_id="first", status="published", revision=1)

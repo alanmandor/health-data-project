@@ -36,7 +36,7 @@ Wait for the API server, scheduler, DAG processor, and PostgreSQL health checks 
 
 ## Dependencies and Storage
 
-Initialization applies DuckDB foundation and SQLite controls without dropping records. The daily DAG also checks bootstrap before capture. Stop Airflow services before rebuilding and rerunning initialization on an existing deployment to avoid overlapping database access. Initialization creates tables, not analytical data. DDL is mounted read-only at /opt/airflow/project/ddl.
+Initialization applies DuckDB foundation and SQLite controls without dropping records. The daily DAG also checks bootstrap before capture. Stop Airflow services before rebuilding and rerunning initialization on an existing deployment to avoid overlapping database access. Initialization creates tables and seeds quality reference catalogs; analytical data requires ingestion. DDL is mounted read-only at /opt/airflow/project/ddl.
 
 requirements.txt pins Airflow and its providers. The Docker build uses the official Airflow 3.1.7 Python 3.12 constraints to resolve compatible runtime dependencies. requirements-dbt.txt pins dbt Core, dbt-duckdb, and DuckDB in a separate virtual environment to avoid dependency conflicts with Airflow. Image versions and top-level packages are pinned; transitive dbt dependencies are resolved at build time, so builds are not yet a fully hashed offline lock.
 

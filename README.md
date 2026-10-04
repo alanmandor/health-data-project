@@ -34,6 +34,8 @@ After Docker startup, follow [baseline staging](docs/raw_ingestion.md#stage-the-
 
 Both DAGs remain manual: the daily execution time, operational availability timeout, and producer inventory mapping must be configured before automatic scheduling. The tentative weekly production trigger is Monday 03:00 America/Bogota, conditional on validated delivery readiness.
 
+The [scope and limitations guide](docs/scope_and_limitations.md) explains local concurrency, incremental processing boundaries, Snowflake portability, data interpretation, and the remaining production deployment requirements.
+
 To run the isolated test suite and both DAGs twice:
 
 ```bash

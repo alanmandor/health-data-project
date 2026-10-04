@@ -38,7 +38,7 @@ flowchart LR
 
 Implement participant and device hubs, their assignment link, and descriptive satellites. Use separate participant-attached observation satellites for steps and heart rate, and session/response hubs and links for sleep and wellness. See [ADR 003](decisions/003_data_vault_model.md) for grains, enrollment context, versioning, and device attribution limits.
 
-The [table catalog](table_catalog.md) defines proposed control, raw/staging, vault, current-state, dimensional, daily, and revision-specific publication relations before loading implementation.
+The [table catalog](table_catalog.md) defines implemented control, raw/staging, Vault, current-state, dimensional, daily, revision-specific publication, and quality reference relations. The [foundation guide](database_ddl.md) documents the current 60-table contract and verification coverage.
 
 Minute observations use participant and UTC timestamp discriminators rather than one hub per reading. Raw and vault history preserve source evidence; current projections apply accepted quality rules and authoritative delta precedence.
 

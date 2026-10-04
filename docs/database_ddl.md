@@ -6,12 +6,33 @@ The assessment brief, page 2, requires daily freshness for clinical analytics an
 
 ## Foundation Files
 
-- [DuckDB foundation](../infra/ddl/duckdb/001_foundation.sql): 57 tables and staging/consumer views across eight schemas, including Vault, daily, and frozen publication controls.
+- [DuckDB foundation](../infra/ddl/duckdb/001_foundation.sql): 60 tables and staging/consumer views across eight schemas, including Vault, daily, frozen publication controls, and three populated quality equivalence catalogs.
 - [Snowflake foundation](../infra/ddl/snowflake/001_foundation.sql): matching logical contracts, native types, managed-access schemas, and secure views.
 - [Snowflake team roles](../infra/ddl/snowflake/002_reader_roles.sql): published-data read access, writable team workspaces, and dedicated query warehouses. The filename is retained for compatibility.
 - [SQLite controls](../infra/ddl/sqlite/001_control_registry.sql): extends the existing delivery registry without dropping records.
+- [DuckDB quality-domain migration](../infra/ddl/duckdb/002_quality_domains.sql): adds enforced domains to existing issue and resolution tables while preserving their history.
+- Quality catalog setup for existing warehouses: [DuckDB](../infra/ddl/duckdb/003_quality_catalogs.sql) and [Snowflake](../infra/ddl/snowflake/003_quality_catalogs.sql).
 
-These DDL scripts create empty objects. Docker bootstrap and [raw ingestion](raw_ingestion.md) initialize and populate the raw layer. [dbt staging and quality](dbt_staging_quality.md) normalize timestamps and evaluate candidates with explicit rejection, conflict, and reference decisions. [Data Vault loading](data_vault_loading.md) appends identities, versions, lineage, decision changes, and commit checkpoints. Foundation staging views are created only if absent so repeatable bootstrap preserves dbt definitions. [Daily analytics](daily_analytics.md) and [weekly biostatistics](weekly_biostatistics.md) implement validated local publication gates.
+Foundation DDL creates empty data tables and populates the three quality reference catalogs. Docker bootstrap and [raw ingestion](raw_ingestion.md) initialize and populate the raw layer. [dbt staging and quality](dbt_staging_quality.md) normalize timestamps and evaluate candidates with explicit rejection, conflict, and reference decisions. [Data Vault loading](data_vault_loading.md) appends identities, versions, lineage, decision changes, and commit checkpoints. Foundation staging views are created only if absent so repeatable bootstrap preserves dbt definitions. [Daily analytics](daily_analytics.md) and [weekly biostatistics](weekly_biostatistics.md) implement validated local publication gates.
+
+### Quality Reference Catalogs
+
+The foundation grew from 57 to 60 tables by adding the following equivalence catalogs.
+All three use `code` as the primary key and include `display_name` and `description`
+in American English. Their definitions and seeds share one source in
+[generate_ddl.py](../scripts/generate_ddl.py).
+
+| Table | Related ledger field | Codes |
+| --- | --- | --- |
+| `business.quality_issue_statuses` | `business.quality_issues.current_status` | `open`, `resolved` |
+| `business.quality_severities` | `business.quality_issues.severity` | `error`, `warning`, `pending` |
+| `business.quality_resolution_codes` | `business.quality_resolutions.resolution_code` | `reference_resolved`, `superseded_by_accepted_delta`, `source_deleted`, `rule_cleared`, `excluded_at_consolidation`, `reopened` |
+
+These relationships describe code equivalences; no foreign keys or workflow changes
+were added. In particular, `reopened` is a transition code whose resulting issue
+status is `open`. DuckDB domain checks remain in force. Snowflake receives the same
+catalog rows, with pipeline-level validation and no claimed cloud execution.
+See the [issue lifecycle](quality_issue_lifecycle.md) for installation and usage.
 
 scripts/generate_ddl.py is the source for both foundation files. Regenerate both dialects together. CREATE TABLE IF NOT EXISTS supports repeatable setup but does not migrate columns. Later structural changes need migrations. DuckDB bootstrap is transactional; Snowflake DDL commits independently and can leave partial setup after failure.
 
@@ -89,6 +110,20 @@ docker compose exec -T airflow-scheduler python /opt/airflow/project/scripts/gen
 docker compose exec -T airflow-scheduler /opt/airflow/dbt-venv/bin/python /opt/airflow/project/scripts/verify_ddl.py --ddl-root /tmp/reviewed-ddl
 ```
 
-Six tests use temporary in-memory databases to verify all 57 tables, repeatable setup with records, invalid raw values versus validated facts, draft filtering, latest published revisions, frozen cohort attributes, safe casts, sleep array positions, and SQLite preservation. They do not initialize or modify the persistent warehouse.
+Nine tests use temporary in-memory databases to verify all 60 tables, repeatable setup with records and catalog seeds, quality domain constraints and transactional migration, invalid raw values versus validated facts, draft filtering, latest published revisions, frozen cohort attributes, safe casts, sleep array positions, and SQLite preservation. They do not initialize or modify the persistent warehouse.
+
+The original six foundation tests were extended by these three tests in
+[verify_ddl.py](../scripts/verify_ddl.py):
+
+| Added test | What it verifies |
+| --- | --- |
+| `test_quality_domains_reject_invalid_inserts_and_updates` | Invalid issue states, classifications, and resolution codes fail; all six supported resolution codes are accepted |
+| `test_quality_migration_preserves_history_and_repeats` | Repeating the migration preserves complete issue and resolution rows, including identifiers and timestamps |
+| `test_quality_migration_rolls_back_invalid_existing_history` | An invalid historical resolution code aborts the migration, preserves both original tables, and leaves no replacement tables |
+
+Catalog counts and exact English equivalences are checked by the existing
+`test_bootstrap_preserves_existing_records_and_all_tables` and the targeted
+[verify_quality_catalogs.py](../scripts/verify_quality_catalogs.py) command. The
+catalog addition does not introduce three more tests or require a full pipeline replay.
 
 Execute local foundation SQL against the chosen DuckDB warehouse with the dbt environment's connection when initialization is needed. Orchestrated access must use the shared duckdb_access pool. Snowflake syntax, actual grants, queries, and denied writes require validation on a real account.

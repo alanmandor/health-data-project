@@ -8,7 +8,7 @@ The daily DAG runs `initialize_warehouse -> capture_delivery -> load_raw -> arch
 
 `src/health_pipeline/dbt_quality.py` invokes the isolated dbt executable, copies the committed profile template into writable runtime storage, and writes dbt logs, compiled SQL, and `run_results.json` under `/opt/airflow/project-data/dbt`. SQL source files remain read-only. No new dependency or image rebuild is needed for this phase when the existing pinned image is available.
 
-The foundation creates provisional staging views only if absent. dbt replaces them with its managed definitions; repeated warehouse bootstrap preserves those definitions. Consumer views and the 51 foundation tables remain separate from these additional internal models.
+The foundation creates provisional staging views only if absent. dbt replaces them with its managed definitions; repeated warehouse bootstrap preserves those definitions. Consumer views and the 60 foundation tables remain separate from these additional internal models. Current schema and verification counts are maintained in the [foundation guide](database_ddl.md).
 
 ## Model sequence
 
