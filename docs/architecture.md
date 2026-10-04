@@ -1,18 +1,22 @@
 # Architecture outline
 
-Status: platform and integration direction selected; implementation pending. See the [decision records](README.md) and [quality policy](data_quality_policy.md) for accepted contracts and assumptions.
+Status: implemented local platform and integration pipeline. See the [decision records](README.md), [quality policy](data_quality_policy.md), and [weekly publication](weekly_biostatistics.md) for contracts and practical limits.
 
 ## Target flow
 
 ```mermaid
 flowchart LR
-    S3[Source S3 files] --> Raw[Immutable raw landing]
+    S3[Supplied source files] --> Delivery[Explicit delivery manifest and copied files]
+    Delivery --> Raw[Immutable raw landing]
     Raw --> Stage[Typed staging and quality checks]
     Stage --> Vault[Data Vault 2.0 raw vault]
     Vault --> Business[Business rules and reusable metrics]
     Business --> Marts[Kimball dimensional marts]
     Marts --> Daily[Daily clinical analytics]
-    Marts --> Weekly[Weekly biostatistics output]
+    Daily --> Ready[SQLite daily readiness]
+    Ready --> Freeze[Freeze accepted versions and correction cutoff]
+    Marts --> Freeze
+    Freeze --> Weekly[Published weekly biostatistics revision]
     Airflow[Apache Airflow] -. orchestrates .-> Raw
     Airflow -. invokes dbt .-> Stage
     Airflow -. invokes dbt .-> Marts
@@ -22,13 +26,13 @@ flowchart LR
 
 | Component | Responsibility | Status |
 | --- | --- | --- |
-| Python | Retrieve source files, inventory inputs, profile data, load staging | Planned |
-| Airflow | Schedule daily and weekly workflows, retries, dependencies, and backfills | Local services verified; processing DAGs pending |
-| dbt Core | SQL transformations, model dependencies, data tests, and generated documentation | Installed in an isolated environment; models pending |
+| Python | Inventory/stage supplied files, preserve raw history, and apply transactional outputs | Implemented and verified locally |
+| Airflow | Orchestrate daily and weekly workflows, retries, dependencies, and explicit scopes | Both complete DAGs verified; automatic schedules await operational settings |
+| dbt Core | Typed quality, dimensional candidates, daily aggregates, and frozen weekly calculations | Four runnable projects with isolated environments and runtime paths |
 | Docker Compose | Reproducible local development environment | Configuration and startup verified |
-| DuckDB with dbt-duckdb | Execute dbt models and serve analytical tables | Dependencies installed; analytical models pending |
+| DuckDB with dbt-duckdb | Execute dbt models and serve analytical tables | Validated analytics and immutable weekly revisions implemented |
 | PostgreSQL | Store Airflow orchestration state separately from analytical data | Metadata database initialized and verified |
-| CI | Validate code, dbt models, and reproducibility | Planned |
+| Verification | Validate code, SQL models, replay, and workflow behavior | Local unit/integration tests and isolated DAG checks; hosted CI is optional future deployment work |
 
 ## Data Vault Integration
 

@@ -1,10 +1,10 @@
 # Docker Quick Start
 
-This setup starts the local Airflow infrastructure. The [first-phase DAGs](airflow_phase_one.md) support manual delivery registration and weekly calendar inspection; the complete daily and weekly data pipelines remain under development.
+This setup starts Airflow and initializes warehouse/control tables. The [daily pipeline](daily_analytics.md) captures explicit deliveries and publishes validated analytics; [weekly biostatistics](weekly_biostatistics.md) freezes and publishes revisioned outputs after readiness checks.
 
 ## Prerequisites
 
-Install Docker Desktop with the Linux engine running (Windows users should use WSL 2), or Docker Engine on Linux, and Docker Compose v2.14 or newer. Allocate at least 4 GB of Docker memory; 8 GB is recommended. No host Python, PostgreSQL, Airflow, or dbt installation is required.
+Install Docker Desktop with the Linux engine running (Windows users should use WSL 2), or Docker Engine on Linux, and Docker Compose v2.14 or newer. Allocate at least 8 GB of Docker memory for the supplied baseline and allow persistent disk space for raw history, the warehouse, temporary spill, and frozen manifests. No host Python, PostgreSQL, Airflow, or dbt installation is required.
 
 Run all commands from the repository root. This Compose project is named `health-data-project`; it does not reuse or modify unrelated containers. PostgreSQL has no published host port. The Airflow UI binds to localhost only.
 
@@ -36,11 +36,13 @@ Wait for the API server, scheduler, DAG processor, and PostgreSQL health checks 
 
 ## Dependencies and Storage
 
+Initialization applies DuckDB foundation and SQLite controls without dropping records. The daily DAG also checks bootstrap before capture. Stop Airflow services before rebuilding and rerunning initialization on an existing deployment to avoid overlapping database access. Initialization creates tables, not analytical data. DDL is mounted read-only at /opt/airflow/project/ddl.
+
 requirements.txt pins Airflow and its providers. The Docker build uses the official Airflow 3.1.7 Python 3.12 constraints to resolve compatible runtime dependencies. requirements-dbt.txt pins dbt Core, dbt-duckdb, and DuckDB in a separate virtual environment to avoid dependency conflicts with Airflow. Image versions and top-level packages are pinned; transitive dbt dependencies are resolved at build time, so builds are not yet a fully hashed offline lock.
 
-Run dbt through /opt/airflow/dbt-venv/bin/dbt, or the DBT_EXECUTABLE environment variable. Source code mounts are read-only. Future dbt invocations must redirect targets, logs, installed packages, and profiles to writable project-data locations. A runnable dbt project and analytical models are not included yet.
+The pipeline runs dbt through /opt/airflow/dbt-venv/bin/dbt, or DBT_EXECUTABLE. Source mounts are read-only; quality, dimensional, daily, and weekly runners redirect profiles, targets, and logs to separate writable project-data directories. All four dbt projects are included in the repository.
 
-Docker named volumes store metadata, logs, raw data, and analytical files outside the OneDrive repository. Source data is not baked into the image. PROJECT_RAW_DIR and PROJECT_DATABASE_PATH define the future ingestion locations. Keep all shared database access under duckdb_access, including manual commands while scheduled tasks are active.
+Docker named volumes store metadata, logs, raw data, analytical files, and frozen input manifests outside the repository. Source data is not baked into the image. PROJECT_RAW_DIR and PROJECT_DATABASE_PATH define the ingestion locations. Keep all shared database access under duckdb_access; run standalone warehouse commands only while other warehouse tasks are idle.
 
 ## Inspect and Stop
 
@@ -62,7 +64,7 @@ Do not add --volumes unless you intend to permanently delete this project's meta
 
 ## Scheduling Status
 
-Timestamp reference: UTC. Study calendar: America/Bogota. The selected weekly trigger is Monday 03:00 local time (08:00 UTC), conditional on validated Sunday delivery. Daily trigger time and operational delivery sensor timeout remain to be configured. First-phase DAGs use schedule=None and require explicit manual scope; no automatic baseline or live-source processing is enabled.
+Timestamp reference: UTC. Study calendar: America/Bogota. The tentative weekly trigger is Monday 03:00 local time (08:00 UTC), conditional on validated delivery. Both complete DAGs use schedule=None and require explicit manual scope. Configure the daily trigger time, operational sensor timeout, and expected producer inventory before automatic scheduling. Follow [baseline ingestion](raw_ingestion.md) and [weekly publication](weekly_biostatistics.md) to execute the exercise.
 
 Reference: [Airflow Docker guide](https://airflow.apache.org/docs/apache-airflow/3.1.7/howto/docker-compose/index.html).
 

@@ -1,6 +1,6 @@
 # Processing and Incremental Loading Strategy
 
-Status: accepted processing direction; implementation pending. DuckDB and dbt-duckdb are selected locally, with PostgreSQL for Airflow metadata. The [decision records](README.md) define delta delivery and Data Vault contracts; the [quality policy](data_quality_policy.md) governs corrections and consolidation.
+Status: implemented local processing direction through daily analytics and frozen weekly publication. DuckDB and dbt-duckdb run transformations, with PostgreSQL for Airflow metadata. The [decision records](README.md) define delta delivery and Data Vault contracts; the [quality policy](data_quality_policy.md) governs corrections and consolidation.
 
 ## Processing Order and Responsibilities
 

@@ -1,0 +1,12 @@
+wearable_health:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('PROJECT_DATABASE_PATH') }}"
+      threads: 1
+      settings:
+        TimeZone: UTC
+        threads: 1
+        memory_limit: "{{ env_var('VAULT_MEMORY_LIMIT', '4GB') }}"
+        preserve_insertion_order: false

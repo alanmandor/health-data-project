@@ -1,0 +1,9 @@
+wearable_health:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('PROJECT_DATABASE_PATH') }}"
+      threads: 1
+      settings:
+        TimeZone: UTC

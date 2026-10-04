@@ -1,6 +1,6 @@
 # Analytics and Biostatistics Publication Schedule
 
-Status: accepted scheduling policy; Airflow implementation pending.
+Status: accepted scheduling policy with implemented manual daily and weekly DAGs. [Weekly consolidation](weekly_biostatistics.md) enforces readiness, freezes its cutoff, and publishes revisions. Automatic scheduling awaits the operational settings described below.
 
 ## Period and Time Zone
 
@@ -19,7 +19,7 @@ Interpret source repository/location as the configured data delivery location, c
 The workflow must:
 
 1. Check availability of the required Sunday delivery using its expected batch manifest or equivalent configured delivery inventory.
-2. Load and validate Sunday data and eligible corrections, then complete daily analytics.
+2. Require the daily pipeline to have loaded and validated Sunday data and eligible corrections and completed daily analytics; the weekly DAG does not perform independent ingestion.
 3. Register the weekly publication, freeze its accepted input manifest, and set correction_cutoff_at to that registration time.
 4. Consolidate the preceding week's biostatistics and record the publication revision and actual completion time.
 

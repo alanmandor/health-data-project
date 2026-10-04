@@ -6,12 +6,12 @@ The assessment brief, page 2, requires daily freshness for clinical analytics an
 
 ## Foundation Files
 
-- [DuckDB foundation](../infra/ddl/duckdb/001_foundation.sql): 44 tables and staging/consumer views across eight schemas.
+- [DuckDB foundation](../infra/ddl/duckdb/001_foundation.sql): 57 tables and staging/consumer views across eight schemas, including Vault, daily, and frozen publication controls.
 - [Snowflake foundation](../infra/ddl/snowflake/001_foundation.sql): matching logical contracts, native types, managed-access schemas, and secure views.
 - [Snowflake team roles](../infra/ddl/snowflake/002_reader_roles.sql): published-data read access, writable team workspaces, and dedicated query warehouses. The filename is retained for compatibility.
 - [SQLite controls](../infra/ddl/sqlite/001_control_registry.sql): extends the existing delivery registry without dropping records.
 
-These scripts create empty objects. Ingestion, CDC selection, timestamp normalization, quality gates, and publication remain pipeline work. Business current-state views will be implemented with dbt. Staging preserves payloads and timestamp strings; safe-cast failures become NULL and require explicit parsing diagnostics and quarantine decisions.
+These DDL scripts create empty objects. Docker bootstrap and [raw ingestion](raw_ingestion.md) initialize and populate the raw layer. [dbt staging and quality](dbt_staging_quality.md) normalize timestamps and evaluate candidates with explicit rejection, conflict, and reference decisions. [Data Vault loading](data_vault_loading.md) appends identities, versions, lineage, decision changes, and commit checkpoints. Foundation staging views are created only if absent so repeatable bootstrap preserves dbt definitions. [Daily analytics](daily_analytics.md) and [weekly biostatistics](weekly_biostatistics.md) implement validated local publication gates.
 
 scripts/generate_ddl.py is the source for both foundation files. Regenerate both dialects together. CREATE TABLE IF NOT EXISTS supports repeatable setup but does not migrate columns. Later structural changes need migrations. DuckDB bootstrap is transactional; Snowflake DDL commits independently and can leave partial setup after failure.
 
@@ -89,6 +89,6 @@ docker compose exec -T airflow-scheduler python /opt/airflow/project/scripts/gen
 docker compose exec -T airflow-scheduler /opt/airflow/dbt-venv/bin/python /opt/airflow/project/scripts/verify_ddl.py --ddl-root /tmp/reviewed-ddl
 ```
 
-Six tests use temporary in-memory databases to verify all 44 tables, repeatable setup with records, invalid raw values versus validated facts, draft filtering, latest published revisions, frozen cohort attributes, safe casts, sleep array positions, and SQLite preservation. They do not initialize or modify the persistent warehouse.
+Six tests use temporary in-memory databases to verify all 57 tables, repeatable setup with records, invalid raw values versus validated facts, draft filtering, latest published revisions, frozen cohort attributes, safe casts, sleep array positions, and SQLite preservation. They do not initialize or modify the persistent warehouse.
 
 Execute local foundation SQL against the chosen DuckDB warehouse with the dbt environment's connection when initialization is needed. Orchestrated access must use the shared duckdb_access pool. Snowflake syntax, actual grants, queries, and denied writes require validation on a real account.

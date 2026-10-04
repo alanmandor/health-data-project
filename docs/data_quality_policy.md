@@ -1,6 +1,6 @@
 # Data Quality and Correction Policy
 
-Status: accepted rules for the exercise; implementation pending. Assumptions are explicit and raw data remains unchanged.
+Status: accepted rules implemented in [local staging and quality](dbt_staging_quality.md), [persistent issue history](quality_issue_lifecycle.md), and [weekly biostatistics consolidation](weekly_biostatistics.md). Assumptions are explicit and raw data remains unchanged.
 
 ## Duplicates, Time, and References
 

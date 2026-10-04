@@ -1,0 +1,23 @@
+name: wearable_health
+version: '1.0.0'
+config-version: 2
+profile: wearable_health
+model-paths: [models]
+macro-paths: [macros]
+test-paths: [tests]
+clean-targets: [target, dbt_packages]
+vars:
+  study_timezone: America/Bogota
+  quality_rule_version: staging-quality-v1
+  code_version: manual
+models:
+  wearable_health:
+    staging:
+      +schema: staging
+      +materialized: view
+    raw_vault:
+      +schema: staging
+      +materialized: view
+    business_vault:
+      +schema: business
+      +materialized: view

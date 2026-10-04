@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS raw.batch_records (
     PRIMARY KEY (batch_id, record_id)
 );
 
+CREATE TABLE IF NOT EXISTS raw.file_loads (
+    file_id VARCHAR NOT NULL,
+    record_count NUMBER(38,0) NOT NULL,
+    loaded_at TIMESTAMP_TZ(6) NOT NULL,
+    PRIMARY KEY (file_id)
+);
+
 CREATE TABLE IF NOT EXISTS vault.hub_participant (
     participant_hk VARCHAR NOT NULL,
     business_namespace VARCHAR NOT NULL,
@@ -353,6 +360,16 @@ CREATE TABLE IF NOT EXISTS business.version_decisions (
     PRIMARY KEY (decision_id)
 );
 
+CREATE TABLE IF NOT EXISTS business.vault_loads (
+    evaluation_id VARCHAR NOT NULL,
+    input_hash VARCHAR NOT NULL,
+    quality_code_version VARCHAR NOT NULL,
+    loader_code_version VARCHAR NOT NULL,
+    study_hk VARCHAR NOT NULL,
+    committed_at TIMESTAMP_TZ(6) NOT NULL,
+    PRIMARY KEY (evaluation_id)
+);
+
 CREATE TABLE IF NOT EXISTS business.quality_issues (
     issue_id VARCHAR NOT NULL,
     batch_id VARCHAR NOT NULL,
@@ -375,6 +392,14 @@ CREATE TABLE IF NOT EXISTS business.quality_resolutions (
     PRIMARY KEY (resolution_id)
 );
 
+CREATE TABLE IF NOT EXISTS business.quality_evaluations (
+    evaluation_id VARCHAR NOT NULL,
+    vault_evaluation_id VARCHAR NOT NULL,
+    implementation_hash VARCHAR NOT NULL,
+    committed_at TIMESTAMP_TZ(6) NOT NULL,
+    PRIMARY KEY (evaluation_id)
+);
+
 CREATE TABLE IF NOT EXISTS business.affected_participant_dates (
     study_hk VARCHAR NOT NULL,
     participant_hk VARCHAR NOT NULL,
@@ -386,6 +411,41 @@ CREATE TABLE IF NOT EXISTS business.affected_participant_dates (
     PRIMARY KEY (study_hk, participant_hk, local_date, change_id)
 );
 
+CREATE TABLE IF NOT EXISTS business.participant_date_state (
+    study_hk VARCHAR NOT NULL,
+    participant_hk VARCHAR NOT NULL,
+    local_date DATE NOT NULL,
+    state_hash VARCHAR NOT NULL,
+    evaluation_id VARCHAR NOT NULL,
+    PRIMARY KEY (study_hk, participant_hk, local_date)
+);
+
+CREATE TABLE IF NOT EXISTS business.impact_evaluations (
+    evaluation_id VARCHAR NOT NULL,
+    vault_evaluation_id VARCHAR NOT NULL,
+    quality_evaluation_id VARCHAR NOT NULL,
+    implementation_hash VARCHAR NOT NULL,
+    affected_date_count NUMBER(38,0) NOT NULL,
+    committed_at TIMESTAMP_TZ(6) NOT NULL,
+    PRIMARY KEY (evaluation_id)
+);
+
+CREATE TABLE IF NOT EXISTS business.mart_evaluations (
+    evaluation_id VARCHAR NOT NULL,
+    impact_evaluation_id VARCHAR NOT NULL,
+    implementation_hash VARCHAR NOT NULL,
+    affected_date_count NUMBER(38,0) NOT NULL,
+    committed_at TIMESTAMP_TZ(6) NOT NULL,
+    PRIMARY KEY (evaluation_id)
+);
+
+CREATE TABLE IF NOT EXISTS business.mart_build_scope (
+    study_hk VARCHAR NOT NULL,
+    participant_hk VARCHAR NOT NULL,
+    local_date DATE NOT NULL,
+    PRIMARY KEY (study_hk, participant_hk, local_date)
+);
+
 CREATE TABLE IF NOT EXISTS business.daily_publications (
     study_hk VARCHAR NOT NULL,
     local_date DATE NOT NULL,
@@ -395,6 +455,28 @@ CREATE TABLE IF NOT EXISTS business.daily_publications (
     status VARCHAR NOT NULL,
     published_at TIMESTAMP_TZ(6),
     PRIMARY KEY (study_hk, local_date)
+);
+
+CREATE TABLE IF NOT EXISTS business.daily_evaluations (
+    evaluation_id VARCHAR NOT NULL,
+    mart_evaluation_id VARCHAR NOT NULL,
+    implementation_hash VARCHAR NOT NULL,
+    input_manifest_hash VARCHAR NOT NULL,
+    committed_at TIMESTAMP_TZ(6) NOT NULL,
+    PRIMARY KEY (evaluation_id)
+);
+
+CREATE TABLE IF NOT EXISTS business.daily_readiness_outbox (
+    evaluation_id VARCHAR NOT NULL,
+    study_hk VARCHAR NOT NULL,
+    local_date DATE NOT NULL,
+    input_manifest_hash VARCHAR NOT NULL,
+    rule_version VARCHAR NOT NULL,
+    code_version VARCHAR NOT NULL,
+    validated_at TIMESTAMP_TZ(6) NOT NULL,
+    coverage_json VARIANT NOT NULL,
+    warning_counts_json VARIANT NOT NULL,
+    PRIMARY KEY (evaluation_id, study_hk, local_date)
 );
 
 CREATE TABLE IF NOT EXISTS marts.dim_participant (
@@ -716,7 +798,50 @@ CREATE TABLE IF NOT EXISTS publication_build.sleep_stage_exclusions (
     PRIMARY KEY (publication_id, session_version_id, stage_position)
 );
 
-CREATE OR REPLACE SECURE VIEW staging.stg_participants COPY GRANTS AS
+CREATE TABLE IF NOT EXISTS publication_build.requests (
+    request_id VARCHAR NOT NULL,
+    publication_id VARCHAR NOT NULL,
+    scope_json VARIANT NOT NULL,
+    PRIMARY KEY (request_id)
+);
+
+CREATE TABLE IF NOT EXISTS publication_build.inputs (
+    publication_id VARCHAR NOT NULL,
+    input_kind VARCHAR NOT NULL,
+    version_id VARCHAR NOT NULL,
+    source_relation VARCHAR NOT NULL,
+    business_key_hash VARCHAR NOT NULL,
+    payload_hash VARCHAR NOT NULL,
+    PRIMARY KEY (publication_id, input_kind, version_id)
+);
+
+CREATE TABLE IF NOT EXISTS publication_build.readiness (
+    publication_id VARCHAR NOT NULL,
+    local_date DATE NOT NULL,
+    revision NUMBER(38,0) NOT NULL,
+    input_manifest_hash VARCHAR NOT NULL,
+    rule_version VARCHAR NOT NULL,
+    code_version VARCHAR NOT NULL,
+    coverage_json VARIANT NOT NULL,
+    warning_counts_json VARIANT NOT NULL,
+    PRIMARY KEY (publication_id, local_date)
+);
+
+CREATE TABLE IF NOT EXISTS publication_build.sleep_stage_candidates (
+    publication_id VARCHAR NOT NULL,
+    session_version_id VARCHAR NOT NULL,
+    stage_position NUMBER(38,0) NOT NULL,
+    sleep_session_hk VARCHAR NOT NULL,
+    stage_type VARCHAR NOT NULL,
+    start_at_utc TIMESTAMP_TZ(6),
+    end_at_utc TIMESTAMP_TZ(6),
+    duration_min_reported NUMBER(18,6),
+    is_post_boundary_awake BOOLEAN NOT NULL,
+    warning_status VARCHAR,
+    PRIMARY KEY (publication_id, session_version_id, stage_position)
+);
+
+CREATE SECURE VIEW IF NOT EXISTS staging.stg_participants AS
 SELECT r.record_id,
        b.batch_id,
        b.delivery_sequence,
@@ -734,7 +859,7 @@ SELECT r.record_id,
 FROM raw.source_records r JOIN raw.batch_records b ON b.record_id = r.record_id
 WHERE r.source_name = 'participants';
 
-CREATE OR REPLACE SECURE VIEW staging.stg_device_metadata COPY GRANTS AS
+CREATE SECURE VIEW IF NOT EXISTS staging.stg_device_metadata AS
 SELECT r.record_id,
        b.batch_id,
        b.delivery_sequence,
@@ -751,7 +876,7 @@ SELECT r.record_id,
 FROM raw.source_records r JOIN raw.batch_records b ON b.record_id = r.record_id
 WHERE r.source_name = 'device_metadata';
 
-CREATE OR REPLACE SECURE VIEW staging.stg_steps COPY GRANTS AS
+CREATE SECURE VIEW IF NOT EXISTS staging.stg_steps AS
 SELECT r.record_id,
        b.batch_id,
        b.delivery_sequence,
@@ -766,7 +891,7 @@ SELECT r.record_id,
 FROM raw.source_records r JOIN raw.batch_records b ON b.record_id = r.record_id
 WHERE r.source_name = 'steps';
 
-CREATE OR REPLACE SECURE VIEW staging.stg_heart_rate COPY GRANTS AS
+CREATE SECURE VIEW IF NOT EXISTS staging.stg_heart_rate AS
 SELECT r.record_id,
        b.batch_id,
        b.delivery_sequence,
@@ -780,7 +905,7 @@ SELECT r.record_id,
 FROM raw.source_records r JOIN raw.batch_records b ON b.record_id = r.record_id
 WHERE r.source_name = 'heart_rate';
 
-CREATE OR REPLACE SECURE VIEW staging.stg_sleep_sessions COPY GRANTS AS
+CREATE SECURE VIEW IF NOT EXISTS staging.stg_sleep_sessions AS
 SELECT r.record_id,
        b.batch_id,
        b.delivery_sequence,
@@ -797,7 +922,7 @@ SELECT r.record_id,
 FROM raw.source_records r JOIN raw.batch_records b ON b.record_id = r.record_id
 WHERE r.source_name = 'sleep';
 
-CREATE OR REPLACE SECURE VIEW staging.stg_wellness COPY GRANTS AS
+CREATE SECURE VIEW IF NOT EXISTS staging.stg_wellness AS
 SELECT r.record_id,
        b.batch_id,
        b.delivery_sequence,
@@ -814,7 +939,7 @@ SELECT r.record_id,
 FROM raw.source_records r JOIN raw.batch_records b ON b.record_id = r.record_id
 WHERE r.source_name = 'wellness_survey';
 
-CREATE OR REPLACE SECURE VIEW staging.stg_sleep_stages COPY GRANTS AS
+CREATE SECURE VIEW IF NOT EXISTS staging.stg_sleep_stages AS
 SELECT s.record_id AS session_record_id,
        s.batch_id,
        s.delivery_sequence,

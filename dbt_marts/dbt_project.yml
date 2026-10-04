@@ -1,0 +1,10 @@
+name: wearable_marts
+version: '1.0.0'
+config-version: 2
+profile: wearable_health
+model-paths: [models]
+macro-paths: [macros]
+models:
+  wearable_marts:
+    +schema: business
+    +materialized: view

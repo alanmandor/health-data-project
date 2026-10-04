@@ -1,6 +1,6 @@
 # Airflow Orchestration Design
 
-Status: orchestration design; local runtime configuration is provided in compose.yaml. The [first-phase DAGs](airflow_phase_one.md) implement manual delivery registration and weekly calendar inspection only. Processing, analytical readiness, and publication remain unimplemented. Existing delivery, quality, and publication policies remain authoritative.
+Status: complete manual orchestration in compose.yaml. The [daily pipeline](daily_analytics.md) runs ingestion through validated analytics/readiness. [Weekly biostatistics](weekly_biostatistics.md) waits for prerequisites, freezes accepted inputs and the cutoff, and publishes immutable revisions. Existing delivery, quality, and publication policies remain authoritative.
 
 The two-DAG design with tasks grouped by independently retryable processing phase is accepted. Keep ingestion/transformation functions outside DAG definitions. dbt manages model-level dependencies; Airflow invokes coherent model groups instead of duplicating the entire dbt dependency graph. The [delivery manifest contract](delivery_manifest.md) specifies availability and immutable batch registration.
 
@@ -73,6 +73,6 @@ Use catchup=False for the initial demonstration. Replay the January-February 202
 5. Implement weekly dependency, atomic input freeze, and versioned publication.
 6. Verify missing delivery, declared empty delta, delayed Sunday data, critical validation failure, conflicting rows, retry after commit, Monday-to-Tuesday delay, and late publication revisions.
 
-Still required before scheduling: the daily trigger time, sensor timeout, concrete manifest validators/registration and processing commands. The local runtime pins have passed infrastructure startup checks; data pipeline behavior remains to be tested. The public baseline inventory must not be mistaken for a newly arrived Sunday delta.
+Still required before automatic scheduling: daily trigger time, operational sensor timeout, and producer inventory mapping. Both complete DAGs use the shared database pool for warehouse tasks. The weekly sensor reads SQLite in reschedule mode; freeze rechecks current validated fingerprints, then retries use immutable publication selections. Explicit expected delivery identities prevent the public baseline inventory from being mistaken for a future Sunday delta.
 
 References: [Airflow scheduling](https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/cron.html), [sensors](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/sensors.html), [pools](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/pools.html), [LocalExecutor](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/executor/local.html).

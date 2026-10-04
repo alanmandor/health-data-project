@@ -22,6 +22,7 @@ SCORES = "fatigue_score:h stress_score:h readiness_score:h sleep_quality_score:h
 
 table("raw.source_records", "record_id:s! file_id:s! source_name:s! row_number:i! payload_json:j! original_record_text:s ingested_at:t!", "record_id", checks=("row_number >= 0",))
 table("raw.batch_records", "batch_id:s! record_id:s! source_system:s! delivery_sequence:i! object_key:s!", "batch_id, record_id")
+table("raw.file_loads", "file_id:s! record_count:i! loaded_at:t!", "file_id", checks=("record_count >= 0",))
 
 for name, key, fields, unique in [
     ("participant", "participant_hk", "business_namespace:s! participant_id:s!", "business_namespace, participant_id"),
@@ -57,10 +58,18 @@ table("vault.sat_sleep_stage", "session_version_id:s! stage_position:i! stage_ty
 table("vault.version_lineage", "source_relation:s! version_id:s! batch_id:s! record_id:s!", "source_relation, version_id, batch_id, record_id")
 
 table("business.version_decisions", "decision_id:s! version_id:s! source_relation:s! business_key_hash:s! study_hk:s! decision:s! decided_at:t! rule_version:s! batch_id:s! reason_code:s normalized_payload_hash:s", "decision_id", checks=("decision IN ('accepted', 'rejected', 'conflict', 'pending_reference')",))
+table("business.vault_loads", "evaluation_id:s! input_hash:s! quality_code_version:s! loader_code_version:s! study_hk:s! committed_at:t!", "evaluation_id")
 table("business.quality_issues", "issue_id:s! batch_id:s! record_id:s version_id:s rule_code:s! severity:s! first_seen_at:t! current_status:s!", "issue_id")
 table("business.quality_resolutions", "resolution_id:s! issue_id:s! resolved_at:t! resolution_code:s! superseding_version_id:s publication_id:s", "resolution_id")
+table("business.quality_evaluations", "evaluation_id:s! vault_evaluation_id:s! implementation_hash:s! committed_at:t!", "evaluation_id")
 table("business.affected_participant_dates", "study_hk:s! participant_hk:s! local_date:d! change_id:s! reason_code:s! created_at:t! consumed_checkpoint_id:s", "study_hk, participant_hk, local_date, change_id")
+table("business.participant_date_state", "study_hk:s! participant_hk:s! local_date:d! state_hash:s! evaluation_id:s!", "study_hk, participant_hk, local_date")
+table("business.impact_evaluations", "evaluation_id:s! vault_evaluation_id:s! quality_evaluation_id:s! implementation_hash:s! affected_date_count:i! committed_at:t!", "evaluation_id")
+table("business.mart_evaluations", "evaluation_id:s! impact_evaluation_id:s! implementation_hash:s! affected_date_count:i! committed_at:t!", "evaluation_id")
+table("business.mart_build_scope", "study_hk:s! participant_hk:s! local_date:d!", "study_hk, participant_hk, local_date")
 table("business.daily_publications", "study_hk:s! local_date:d! input_manifest_hash:s! rule_version:s! code_version:s! status:s! published_at:t", "study_hk, local_date")
+table("business.daily_evaluations", "evaluation_id:s! mart_evaluation_id:s! implementation_hash:s! input_manifest_hash:s! committed_at:t!", "evaluation_id")
+table("business.daily_readiness_outbox", "evaluation_id:s! study_hk:s! local_date:d! input_manifest_hash:s! rule_version:s! code_version:s! validated_at:t! coverage_json:j! warning_counts_json:j!", "evaluation_id, study_hk, local_date")
 
 table("marts.dim_participant", "participant_sk:s! participant_hk:s! participant_id:s! business_namespace:s! height_cm:n gender:s chronotype:s profile_version_id:s! known_from_at:t! known_to_at:t is_current:b!", "participant_sk", unique=("participant_hk, profile_version_id",))
 table("marts.dim_device", "device_sk:s! device_hk:s! device_id:s! firmware_version:s firmware_provenance:s calibration_date:d device_version_id:s! known_from_at:t! known_to_at:t is_current:b!", "device_sk", unique=("device_hk, device_version_id",))
@@ -87,6 +96,10 @@ WEEK = "study_hk:s! week_start:d! expected_days:i! expected_minutes:i accepted_s
 table("publication_build.participant_week", "publication_id:s! participant_hk:s! " + WEEK, "publication_id, participant_hk")
 table("publication_build.sleep_stages", "publication_id:s! " + STAGES, "publication_id, session_version_id, stage_position")
 table("publication_build.sleep_stage_exclusions", "publication_id:s! session_version_id:s! stage_position:i! reason_code:s! issue_id:s! resolution_id:s!", "publication_id, session_version_id, stage_position")
+table("publication_build.requests", "request_id:s! publication_id:s! scope_json:j!", "request_id")
+table("publication_build.inputs", "publication_id:s! input_kind:s! version_id:s! source_relation:s! business_key_hash:s! payload_hash:s!", "publication_id, input_kind, version_id")
+table("publication_build.readiness", "publication_id:s! local_date:d! revision:i! input_manifest_hash:s! rule_version:s! code_version:s! coverage_json:j! warning_counts_json:j!", "publication_id, local_date")
+table("publication_build.sleep_stage_candidates", STAGES.replace("session_version_id:s!", "publication_id:s! session_version_id:s!"), "publication_id, session_version_id, stage_position")
 
 
 def column_sql(spec, dialect):
@@ -96,6 +109,10 @@ def column_sql(spec, dialect):
 
 
 def view_sql(name, query, dialect):
+    # dbt owns staging after the first build. Repeated bootstrap must preserve it.
+    if name.startswith("staging."):
+        secure = "SECURE " if dialect == "snowflake" else ""
+        return f"CREATE {secure}VIEW IF NOT EXISTS {name} AS\n{query};\n"
     if dialect == "snowflake":
         return f"CREATE OR REPLACE SECURE VIEW {name} COPY GRANTS AS\n{query};\n"
     return f"CREATE OR REPLACE VIEW {name} AS\n{query};\n"

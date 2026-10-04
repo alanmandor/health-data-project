@@ -1,8 +1,8 @@
 # ADR 003: Data Vault Integration Model
 
-Status: Data Vault selected; entity design accepted as the implementation starting point.
+Status: Data Vault selected; entity design implemented locally. See [Data Vault loading](../data_vault_loading.md) for structural retention, accepted-change projections, atomic loading, and verification.
 
-The [table catalog](../table_catalog.md) provides the proposed column/grain contracts, separates wear_site into assignment history and age/max_heart_rate into enrollment context, and adds study_hk to minute-observation discriminators. It defines physical tables versus current-state views; analytical DDL remains unimplemented.
+The [table catalog](../table_catalog.md) provides the column/grain contracts, separates wear_site into assignment history and age/max_heart_rate into enrollment context, and adds study_hk to minute-observation discriminators. Executable foundation DDL exists for DuckDB and Snowflake. Local loading, current-version projections, analytical marts, and frozen publication are implemented.
 
 ## Entities and Grain
 

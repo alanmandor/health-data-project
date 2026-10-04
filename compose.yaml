@@ -23,7 +23,14 @@ x-airflow-common: &airflow-common
     PROJECT_RAW_DIR: /opt/airflow/project-data/raw
     PROJECT_DATABASE_PATH: /opt/airflow/project-data/warehouse.duckdb
     STUDY_TIMEZONE: ${STUDY_TIMEZONE:-America/Bogota}
+    STUDY_CODE: ${STUDY_CODE:-pmdata_2026_01}
+    STUDY_START: ${STUDY_START:-2026-01-08}
+    STUDY_END_EXCLUSIVE: ${STUDY_END_EXCLUSIVE:-2026-02-05}
+    VAULT_MEMORY_LIMIT: ${VAULT_MEMORY_LIMIT:-4GB}
     PROJECT_INCOMING_DIR: /opt/airflow/project-data/incoming
+    PROJECT_ARCHIVE_DIR: /opt/airflow/project-data/archive
+    PROJECT_REGISTRY_PATH: /opt/airflow/project-data/control/deliveries.sqlite
+    PROJECT_DDL_ROOT: /opt/airflow/project/ddl
     PYTHONPATH: /opt/airflow/project/src
     DBT_PROFILES_DIR: /opt/airflow/project-data/dbt-profiles
   volumes:
@@ -31,8 +38,12 @@ x-airflow-common: &airflow-common
     - ./src:/opt/airflow/project/src:ro
     - ./scripts:/opt/airflow/project/scripts:ro
     - ./dbt:/opt/airflow/project/dbt:ro
+    - ./dbt_marts:/opt/airflow/project/dbt_marts:ro
+    - ./dbt_daily:/opt/airflow/project/dbt_daily:ro
+    - ./dbt_weekly:/opt/airflow/project/dbt_weekly:ro
     - ./tests:/opt/airflow/project/tests:ro
     - ./examples:/opt/airflow/project/examples:ro
+    - ./infra/ddl:/opt/airflow/project/ddl:ro
     - project-data:/opt/airflow/project-data
     - airflow-logs:/opt/airflow/logs
   depends_on:

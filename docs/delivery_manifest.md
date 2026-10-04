@@ -1,6 +1,6 @@
 # Delivery Manifest Contract
 
-Status: initial concrete specification for the accepted delta design. The producer does not currently publish daily manifests; the exercise baseline must be registered explicitly. Processing DAGs and manifest registration remain to be implemented.
+Status: implemented local registration and raw ingestion contract. The producer does not publish daily manifests; stage the baseline explicitly with the adapter. See [raw ingestion](raw_ingestion.md) for bootstrap, replay, and archival, [daily readiness](daily_analytics.md), and [frozen weekly publication](weekly_biostatistics.md).
 
 ## Separate the Three Manifests
 

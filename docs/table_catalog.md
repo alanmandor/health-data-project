@@ -1,10 +1,10 @@
 # Logical Table Catalog and Column Contracts
 
-Status: logical contract with executable foundation DDL. See [database DDL and consumer contracts](database_ddl.md) for deployment and verification. Empty tables and initial staging/consumer views are defined; business current-state transformations, parsing diagnostics, and publication gates remain to be implemented. No analytical data has been loaded.
+Status: implemented local pipeline contracts with executable foundation DDL, [daily analytics](daily_analytics.md), and [frozen weekly biostatistics](weekly_biostatistics.md). See [database DDL and consumer contracts](database_ddl.md) for deployment and verification; generated DDL is authoritative for physical columns and public views.
 
 ## Storage and Naming
 
-Use one DuckDB analytical database with raw, staging, vault, business, marts, analytics, and biostatistics schemas. Keep business orchestration controls in the separate SQLite registry on the persistent project-data volume; PostgreSQL remains Airflow metadata only. Do not write project audit tables into Airflow's internal schema.
+Use one DuckDB analytical database with raw, staging, vault, business, marts, publication_build, analytics, and biostatistics schemas. Keep business orchestration controls in the separate SQLite registry on the persistent project-data volume; PostgreSQL remains Airflow metadata only. Do not write project audit tables into Airflow's internal schema.
 
 Names and comments use American English. hk denotes a deterministic SHA-256 hash key represented as VARCHAR; sk denotes a dimensional surrogate key; version_id identifies an immutable source observation version. Integer counters use BIGINT; calendar dates use DATE; instants use TIMESTAMPTZ and UTC session settings. Preserve source timestamp text separately. TIMESTAMPTZ represents an instant, not the original named zone; keep study_timezone and original offsets explicitly. Scores use SMALLINT, source minute counts use BIGINT, normalized step values use DECIMAL(18,6), and percentages/durations use DECIMAL(18,6). Source decimal precision must not be silently truncated before hashing.
 
@@ -43,6 +43,7 @@ batch_id is the deterministic hash of source_system and delivery_id, never an Ai
 | --- | --- | --- |
 | raw.source_records | Append-only table; PK record_id = hash(file_id, row_number) | file_id, source_name, row_number BIGINT, payload_json JSON, original_record_text VARCHAR nullable, ingested_at TIMESTAMPTZ; all required except original text |
 | raw.batch_records | Append-only lineage table; PK (batch_id, record_id) | source_system, delivery_sequence, object_key; records can occur in more than one delivery without duplicating immutable content |
+| raw.file_loads | Transactional file marker; PK file_id | record_count BIGINT, loaded_at TIMESTAMPTZ; committed with raw rows and lineage, including zero-row files |
 | staging.stg_participants | Typed view, one original participant row per batch | Lineage + participant_id, device_id, age_at_enrollment, height_cm, gender, chronotype, max_heart_rate |
 | staging.stg_device_metadata | Typed view, one original device row per batch | Lineage + participant_id, device_id, wear_site, calibration_date, firmware_version_reported, device_label |
 | staging.stg_steps | Typed view, one original observation per batch | Lineage + participant_id, timestamp_original, event_at_utc, steps_reported, unit_reported |
@@ -97,15 +98,18 @@ Assignment dates remain unknown without producer evidence. wear_site belongs to 
 | --- | --- | --- |
 | business.version_decisions | Append-only table; PK decision_id | version_id, source_relation, business_key_hash, study_hk, decision (accepted/rejected/conflict/pending_reference), decided_at TIMESTAMPTZ, rule_version, batch_id, reason_code nullable, normalized_payload_hash nullable; decisions can be superseded, not erased |
 | business.quality_issues | Table; PK issue_id | batch_id, record_id nullable, version_id nullable, rule_code, severity, first_seen_at, current_status; stable identity supports replay |
-| business.quality_resolutions | Append-only table; PK resolution_id | issue_id, resolved_at, resolution_code, superseding_version_id nullable, publication_id nullable; preserve consolidation-specific resolutions |
+| business.quality_resolutions | Append-only table; PK resolution_id | issue_id, resolved_at, resolution_code (including reopened), superseding_version_id nullable, publication_id nullable; preserve lifecycle transitions and future consolidation-specific resolutions |
+| business.quality_evaluations | Append-only table; PK evaluation_id | vault_evaluation_id, implementation_hash, committed_at; checkpoint for atomic issue reconciliation and retries |
 | business.affected_participant_dates | Work queue; PK (study_hk, participant_hk, local_date, change_id) | reason_code, created_at, consumed_checkpoint_id nullable; old and new dates for key/date changes |
-| business.current_participants | View; participant_hk | Latest authoritative accepted profile, master authorization, and lineage |
-| business.current_devices | View; device_hk | Latest accepted metadata, resolved_firmware_version, firmware_provenance |
-| business.current_assignments | View; participant_device_hk | Latest accepted relation state; explicit unknown effective intervals |
-| business.current_enrollments | View; participant_study_hk | Accepted enrollment context and expected coverage window |
-| business.current_steps / current_heart_rate | Views; unique (study_hk, participant_hk, event_at_utc) per source | Accepted observation version, normalized value, local_date, warnings and rule version |
-| business.current_sleep / current_wellness | Views; sleep_session_hk / wellness_response_hk | Accepted complete source version and quality state |
-| business.current_sleep_stages | View; (session_version_id, stage_position) | Stages from the current accepted session version only; no mixing old and new arrays |
+| business.participant_date_state | Current signature; PK (study_hk, participant_hk, local_date) | state_hash, evaluation_id; accepted semantic inputs, contextual warnings, and reference state |
+| business.impact_evaluations | Append-only checkpoint; PK evaluation_id | vault_evaluation_id, quality_evaluation_id, implementation_hash, affected_date_count, committed_at; atomic queue propagation |
+| business.mart_evaluations | Append-only checkpoint; PK evaluation_id | impact_evaluation_id, implementation_hash, affected_date_count, committed_at; atomic dimensional output and queue consumption |
+| business.mart_build_scope | Preparation workspace; PK (study_hk, participant_hk, local_date) | Captured affected dates, including conservative rebuilds when mart code changes; serialized by the warehouse pool |
+| business.daily_evaluations | Append-only checkpoint; PK evaluation_id | mart_evaluation_id, implementation_hash, input_manifest_hash, committed_at; atomic daily analytics evaluation |
+| business.daily_readiness_outbox | Durable receipt; PK (evaluation_id, study_hk, local_date) | input_manifest_hash, rule_version, code_version, validated_at, coverage_json, warning_counts_json; replayed into SQLite after DuckDB commits |
+| business.quality_participants_current | dbt view; unique (record_source, participant_id) | Latest authoritative accepted master and source lineage |
+| business.quality_current | dbt view; unique business_key_hash | Accepted normalized source measurements/reference rows, contextual warnings, and rule version |
+| business.vault_current_versions | View; unique (source_relation, business_key_hash) | Latest accepted domain versions and participant/study identity; payloads reside in immutable domain satellites |
 
 Views resolve the highest accepted delivery sequence per key within its source, excluding later rejected/conflicting corrections. An accepted delete is a tombstone: it removes the current row and does not resurrect an older upsert. Reaccepting a quarantined historical record cannot overwrite a newer accepted version. Selection and rule versions are explicit; no cross-source precedence is invented. Primary reconciliation categories are exclusive, while warning flags may overlap.
 
@@ -128,7 +132,7 @@ Use physical fact tables updated through transactional delete/insert of accepted
 
 Use deterministic surrogate keys from accepted entity/version identity rather than a sequence that changes on full rebuild. known_from/to are system knowledge intervals, not invented source-effective intervals. Fact dimension assignment follows a documented knowledge-as-of-load policy until source effective dates are available; do not claim historically accurate device attribution. If device attribution is ambiguous or lacks evidence, device_sk remains null. gold_participant_devices returns one participant row, flags ambiguous assignments, and does not choose an arbitrary device.
 
-Age and max_heart_rate are enrollment context, available by study through current_enrollments, not global participant dimension attributes. For sleep, the source supplies efficiency_pct but no session total_sleep_min field. reported_stage_sleep_min therefore explicitly sums reported non-awake stage durations; deep_sleep_pct divides reported deep-stage minutes by that total when positive. Preserve contradictory values and warnings; do not silently substitute timestamp-derived durations under the accepted correction policy.
+Age and max_heart_rate are enrollment context, available through accepted enrollment versions and frozen participant snapshots, not global participant dimension attributes. For sleep, the source supplies efficiency_pct but no session total_sleep_min field. reported_stage_sleep_min therefore explicitly sums reported non-awake stage durations; deep_sleep_pct divides reported deep-stage minutes by that total when positive. Preserve contradictory values and warnings; do not silently substitute timestamp-derived durations under the accepted correction policy.
 
 ## Daily Analytics and Versioned Biostatistics
 
@@ -142,6 +146,10 @@ Age and max_heart_rate are enrollment context, available by study through curren
 | biostatistics.sleep_stages | PK (publication_id, session_version_id, stage_position) | Consolidated retained stages with reported duration; unresolved discordant post-boundary awake stages are absent only here |
 | biostatistics.sleep_stage_exclusions | PK (publication_id, session_version_id, stage_position) | reason_code, issue_id, resolution_id; records excluded stages without deleting source history |
 | biostatistics.latest_participant_week | View of highest successfully published revision per study/week | Join publication metadata to participant_week; pending/failed revisions never replace a published revision |
+| publication_build.requests | Frozen request binding; PK request_id | publication_id, scope_json; retries retain the exact scope, expected delivery, and cutoff |
+| publication_build.inputs | Immutable selected version ledger; PK (publication_id, input_kind, version_id) | source_relation, business_key_hash, payload_hash; compressed domain manifests are exported to persistent storage |
+| publication_build.readiness | Frozen daily receipt; PK (publication_id, local_date) | revision, input_manifest_hash, rule_version, code_version, coverage_json, warning_counts_json |
+| publication_build.sleep_stage_candidates | Complete frozen provisional stages; PK (publication_id, session_version_id, stage_position) | Preserved stage values before publication-specific exclusions |
 
 Daily analytics contains the expected participant/date spine even when no observation is valid. expected_minutes comes from study time-zone boundaries intersected with the configured coverage window; 1,440 applies to full Bogotá days, not every international study day. Null means no accepted measurement; an observed zero is valid. For complete declared coverage with valid zero counts, observed_steps_total may be zero; with zero accepted step observations it is null.
 
@@ -159,6 +167,6 @@ Reported sleep values survive provisional and consolidated outputs. Internal awa
 6. Recalculate and validate daily analytics before writing readiness.
 7. Freeze weekly input versions and cutoff, build revision-specific biostatistics, and publish only after validation.
 
-The catalog distinguishes internal base tables from public views. Daily candidates are stored in marts.participant_day_current and exposed only through the matching business.daily_publications gate. Weekly candidates and frozen outputs are stored in publication_build; biostatistics contains published-only views. Public views have logical unique grains, not physical primary keys. The generated DDL is authoritative for exact implemented column names and nullability; staging UTC fields and parse diagnostics remain transformation requirements. Before loading models, configure study_code/business_namespace and implement database/dbt checks. Cohort-wide inferential statistics and clinical cutoffs are not invented here. No sensor/DAG success currently implies that analytical relations have been loaded.
+The catalog distinguishes internal base tables from public views. Daily candidates are stored in marts.participant_day_current and exposed only through the matching business.daily_publications gate. Weekly candidates and frozen outputs are stored in publication_build; biostatistics contains published-only views. Public views have logical unique grains, not physical primary keys. Configure study_code/business_namespace before loading; the pipeline enforces database and quality checks. Cohort-wide inferential statistics and clinical cutoffs are not invented here. Daily publication and readiness precede the weekly frozen cutoff and versioned publication.
 
 References: [Data Vault decision](decisions/003_data_vault_model.md), [quality policy](data_quality_policy.md), [time policy](time_policy.md), [publication schedule](publication_schedule.md).

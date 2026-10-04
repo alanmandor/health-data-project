@@ -1,3 +1,2 @@
-*.sh text eol=lf
-Dockerfile text eol=lf
-*.yaml text eol=lf
+# Keep source hashes and container shell scripts consistent across operating systems.
+* text=auto eol=lf

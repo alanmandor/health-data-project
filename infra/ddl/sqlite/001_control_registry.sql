@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS model_checkpoints (
     scope_json TEXT NOT NULL, input_hash TEXT NOT NULL, rule_version TEXT NOT NULL,
     code_version TEXT NOT NULL, status TEXT NOT NULL, committed_at TEXT
 );
+CREATE TABLE IF NOT EXISTS archive_receipts (
+    source_system TEXT NOT NULL, delivery_id TEXT NOT NULL, object_key TEXT NOT NULL,
+    archive_path TEXT NOT NULL, archived_at TEXT NOT NULL,
+    PRIMARY KEY (source_system, delivery_id, object_key)
+);
 CREATE TABLE IF NOT EXISTS processing_runs (
     attempt_id TEXT PRIMARY KEY NOT NULL, airflow_run_id TEXT NOT NULL,
     task_id TEXT NOT NULL, batch_id TEXT, checkpoint_id TEXT,

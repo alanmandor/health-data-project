@@ -1,6 +1,6 @@
 # ADR 001: Local Analytical Platform
 
-Status: accepted design; implementation pending.
+Status: accepted and implemented locally with DuckDB, dbt, and Docker/Airflow. Snowflake remains the cloud deployment target.
 
 ## Decision
 
