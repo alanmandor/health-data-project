@@ -10,6 +10,8 @@ The daily DAG runs [immutable raw ingestion](docs/raw_ingestion.md), [dbt stagin
 
 ## Local Docker Setup
 
+The [Python application workflow](.github/workflows/python-app.yml) automatically checks generated DDL, foundation and ingestion tests, and complete DAG imports on pushes and pull requests. See [continuous integration](docs/continuous_integration.md) for its scope and evaluator instructions.
+
 Follow the [Docker quick start](docs/docker_quickstart.md) to build the image, initialize Airflow, and start the local services. Dependencies are declared in [requirements.txt](requirements.txt) and [requirements-dbt.txt](requirements-dbt.txt); Airflow and dbt use separate Python environments inside the container.
 
 ## Structure

@@ -1,0 +1,36 @@
+name: Python application
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-app-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate schema, ingestion controls, and DAG imports
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build the project runtime
+        run: docker build --tag health-pipeline-ci --file infra/Dockerfile .
+
+      - name: Run isolated checks
+        run: |
+          docker run --rm \
+            --entrypoint /bin/bash \
+            --env PYTHONPATH=/opt/airflow/project/src \
+            --env AIRFLOW__CORE__LOAD_EXAMPLES=false \
+            --env AIRFLOW__CORE__EXECUTOR=LocalExecutor \
+            --volume "$GITHUB_WORKSPACE:/opt/airflow/project:ro" \
+            health-pipeline-ci /opt/airflow/project/scripts/verify_ci.sh

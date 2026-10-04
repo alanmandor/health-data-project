@@ -1,12 +1,16 @@
 """Compatibility command: inspect complete DAG imports without processing deliveries."""
 
 import json
+import argparse
 
 from airflow.models.dagbag import DagBag
 
 
 def main():
-    bag=DagBag(dag_folder='/opt/airflow/dags',include_examples=False,safe_mode=False)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--dag-folder', default='/opt/airflow/dags')
+    args = parser.parse_args()
+    bag=DagBag(dag_folder=args.dag_folder,include_examples=False,safe_mode=False)
     if bag.import_errors:
         raise RuntimeError('DAG import errors: '+json.dumps(bag.import_errors))
     required={'wearable_daily_pipeline':'publish_daily_analytics',

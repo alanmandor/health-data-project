@@ -21,6 +21,7 @@ This index covers the implemented architecture, data quality rules, verification
 - [Daily analytics and readiness](daily_analytics.md)
 - [Weekly frozen biostatistics](weekly_biostatistics.md)
 - [Local verification results](verification_results.md)
+- [Continuous integration and evaluator checks](continuous_integration.md)
 - [Project scope, limits, and trade-offs](scope_and_limitations.md)
 - [Airflow phase one](airflow_phase_one.md)
 - [Docker quick start](docker_quickstart.md)
